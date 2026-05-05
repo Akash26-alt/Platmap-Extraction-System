@@ -402,7 +402,7 @@ def verify_with_claude(claude_client, annotated_thumbnail,
 
 TASK 1 — CLASSIFY EACH NUMBERED BOX:
 Look at each numbered box and classify:
-  "lot"         : contains Lot {lot_number} inside a polygon boundary
+  "lot"         : contains {lot_number} inside a polygon boundary
   "curve_table" : CURVE | RADIUS | LENGTH | CHORD | BEARING | DELTA columns
   "line_table"  : LINE | BEARING | LENGTH columns
   "title_block" : subdivision name, plat book, county, state
