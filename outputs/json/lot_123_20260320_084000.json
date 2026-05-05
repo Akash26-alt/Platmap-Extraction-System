@@ -1,0 +1,8 @@
+{
+  "error": "OpenRouter API error: All free models failed. Last error: Error code: 404 - {'error': {'message': 'No endpoints found for qwen/qwen2.5-vl-3b-instruct:free.', 'code': 404}, 'user_id': 'user_3BCWDGfIy0QS6Jr1ljEzGq8tgUZ'}",
+  "lot_number": "123",
+  "extraction_confidence": "low",
+  "needs_review": [
+    "entire_extraction"
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "lot_number": "112",
+  "block_number": "",
+  "extraction_timestamp": "2026-03-20T05:27:06.283161",
+  "county": "",
+  "state": "",
+  "plat_book": "",
+  "plat_page": "",
+  "subdivision": "",
+  "boundaries": {
+    "front": {
+      "bearing": "S89\u00b007'00\"E",
+      "distance_ft": 84.24,
+      "street_name": "",
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "rear": {
+      "bearing": "N89\u00b009'00\"W",
+      "distance_ft": 84.47,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "left_side": {
+      "bearing": "N00\u00b020'00\"E",
+      "distance_ft": 131.45,
+      "is_curve": true,
+      "curve_refs": [
+        "C72"
+      ]
+    },
+    "right_side": {
+      "bearing": "S00\u00b022'00\"W",
+      "distance_ft": 131.37,
+      "is_curve": true,
+      "curve_refs": [
+        "C48"
+      ]
+    }
+  },
+  "curves": [
+    {
+      "curve_id": "C48",
+      "radius_ft": 475.0,
+      "length_ft": 135.14,
+      "chord_ft": 134.68,
+      "bearing": "S45\u00b002'01\"W",
+      "delta": "16\u00b018'02\""
+    }
+  ],
+  "easements": [],
+  "special_features": [],
+  "needs_review": [],
+  "extraction_confidence": "",
+  "source_file": "plats/plat8.pdf",
+  "page_number": 0,
+  "model_used": "meta-llama/llama-4-scout-17b-16e-instruct",
+  "lot_bbox": null
+}

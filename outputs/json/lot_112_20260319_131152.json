@@ -1,0 +1,45 @@
+{
+  "lot_number": "112",
+  "block_number": "",
+  "extraction_timestamp": "2026-03-19T13:11:52.979894",
+  "county": "",
+  "state": "",
+  "plat_book": "",
+  "plat_page": "",
+  "subdivision": "",
+  "boundaries": {
+    "front": {
+      "bearing": "N36 53 00 E",
+      "distance_ft": 40.0,
+      "street_name": "Shade Fern O/A Lane",
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "rear": {
+      "bearing": "N53 07 00 W",
+      "distance_ft": 120.0,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "left_side": {
+      "bearing": "S36 53 00 W",
+      "distance_ft": 40.0,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "right_side": {
+      "bearing": "S53 07 00 E",
+      "distance_ft": 40.0,
+      "is_curve": false,
+      "curve_refs": []
+    }
+  },
+  "curves": [],
+  "easements": [],
+  "special_features": [],
+  "needs_review": [],
+  "extraction_confidence": "",
+  "source_file": "plats/capturel2.png",
+  "page_number": 0,
+  "model_used": "meta-llama/llama-4-scout-17b-16e-instruct"
+}

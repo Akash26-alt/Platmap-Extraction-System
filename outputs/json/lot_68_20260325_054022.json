@@ -1,0 +1,8 @@
+{
+  "error": "Claude API error: Connection error.",
+  "lot_number": "68",
+  "extraction_confidence": "low",
+  "needs_review": [
+    "entire_extraction"
+  ]
+}

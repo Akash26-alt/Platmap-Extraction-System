@@ -1,0 +1,46 @@
+{
+  "lot_number": "109",
+  "block_number": "",
+  "extraction_timestamp": "2026-03-20T06:47:17.279176",
+  "county": "Pasco",
+  "state": "Florida",
+  "plat_book": "",
+  "plat_page": "",
+  "subdivision": "Zephyrhills Colony",
+  "boundaries": {
+    "front": {
+      "bearing": "S89\u00b027'00\"W",
+      "distance_ft": 131.45,
+      "street_name": "",
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "rear": {
+      "bearing": "",
+      "distance_ft": null,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "left_side": {
+      "bearing": "N38\u00b053'00\"E",
+      "distance_ft": 120.0,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "right_side": {
+      "bearing": "S53\u00b007'00\"W",
+      "distance_ft": 84.24,
+      "is_curve": false,
+      "curve_refs": []
+    }
+  },
+  "curves": [],
+  "easements": [],
+  "special_features": [],
+  "needs_review": [],
+  "extraction_confidence": "",
+  "source_file": "plats/plat8.pdf",
+  "page_number": 0,
+  "model_used": "meta-llama/llama-4-scout-17b-16e-instruct",
+  "lot_found": true
+}

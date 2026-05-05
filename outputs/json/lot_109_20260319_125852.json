@@ -1,0 +1,8 @@
+{
+  "error": "Groq API error: Error code: 400 - {'error': {'message': 'Image must have at least 2 pixels in each dimension', 'type': 'invalid_request_error'}}",
+  "lot_number": "109",
+  "extraction_confidence": "low",
+  "needs_review": [
+    "entire_extraction"
+  ]
+}

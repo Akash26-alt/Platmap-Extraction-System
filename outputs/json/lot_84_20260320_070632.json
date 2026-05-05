@@ -1,0 +1,46 @@
+{
+  "lot_number": "84",
+  "block_number": "",
+  "extraction_timestamp": "2026-03-20T07:06:32.548978",
+  "county": "",
+  "state": "",
+  "plat_book": "",
+  "plat_page": "",
+  "subdivision": "",
+  "boundaries": {
+    "front": {
+      "bearing": "N26\u00b053'10\"W",
+      "distance_ft": 144.15,
+      "street_name": "SANTA CHRISTINA",
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "rear": {
+      "bearing": "",
+      "distance_ft": null,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "left_side": {
+      "bearing": "N50\u00b028'20\"W",
+      "distance_ft": 104.45,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "right_side": {
+      "bearing": "",
+      "distance_ft": null,
+      "is_curve": false,
+      "curve_refs": []
+    }
+  },
+  "curves": [],
+  "easements": [],
+  "special_features": [],
+  "needs_review": [],
+  "extraction_confidence": "",
+  "source_file": "plats/plat4.pdf",
+  "page_number": 0,
+  "model_used": "meta-llama/llama-4-scout-17b-16e-instruct",
+  "lot_found": true
+}

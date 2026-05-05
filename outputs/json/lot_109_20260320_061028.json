@@ -1,0 +1,47 @@
+{
+  "lot_number": "109",
+  "block_number": "",
+  "extraction_timestamp": "2026-03-20T06:10:28.914919",
+  "county": "",
+  "state": "",
+  "plat_book": "",
+  "plat_page": "",
+  "subdivision": "",
+  "boundaries": {
+    "front": {
+      "bearing": "",
+      "distance_ft": null,
+      "street_name": "",
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "rear": {
+      "bearing": "",
+      "distance_ft": null,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "left_side": {
+      "bearing": "",
+      "distance_ft": null,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "right_side": {
+      "bearing": "",
+      "distance_ft": null,
+      "is_curve": false,
+      "curve_refs": []
+    }
+  },
+  "curves": [],
+  "easements": [],
+  "special_features": [],
+  "needs_review": [],
+  "extraction_confidence": "",
+  "source_file": "plats/plat8.pdf",
+  "page_number": 0,
+  "model_used": "llama-3.3-70b-versatile",
+  "ocr_text": "50.00\n3\n1\n37.76\"\n|\n.!\noe th\nhe\n\u201cB\u20144\" TRACT\n/\nDE /AE/LE\nKN\nUp\nay\n209\n\"B-2\u201d TRACT\nDE/AE/LE L343\nC427\nC425\nL386\nce eee\nLINE OF THE L348 345\n4\na\nE 1/2 OF THE L560 a\noh, 426\nL384\nL $\n1/4 SW OF SEC Pk, \u201c\n% L383 VW\n9\u201426S-21E\nL382 287 /|\n|\nGO F\nCE\n70 oy ky\ner S\\ os\nNS\nts\n07 ) \\e\n31\n\u2122) L579 om\nWT \"B-2\u201d TRACT\nL378\n%0\nWCA\nRO al \u00a9\nOD\nSEN a Vv\nYO 116\n%O\nI\n> QO\nf\nL536\nas\nVAR\ney\n>\n115 of Ke\n%O\nSv CB\noy\nAP L353\nS\n<C145 \"B\u20142\u201d TRACT\noa) % Sy 7\nWBA\n\u00a2 ae, O-\nSY 114 ca\nO/A L355\n%0\nvv 204 ap\nAx\n\\__32\n2 _/\nsy\nL356\nL357\nVA NN, fe) Vs\n15.30'\nC146 | 113\nOp 1369\nL355\nS44\u00b048'27\u00b0E %O Xv O> Om\n/\nFoc\nwo Q% OD\u00bb\nQo- ay\nL371\nx\n%O lay f L372\nay 112 O> OQ\n<5 Orn %O \u201cB\u20142\u201d\nOy TRACT\nQD\nNJ Q- p\nCSTN Op\nSD Ly ay Oy WBA\n\u201cA\nONE\n~%0 Yo\u2122\nwv\nKo 111\nes\nNO O-\u2122 Xv %O =i\n>\n/ SS\nOp\nAP oy\nmae 117 N% %O RY\nZZ\nSD wv >\nNIQ 110\nOQ \\ Xv\nAP %O\nVis\nae\nOp 4s | CURVE. |\nN 118 % VA\n21.86\nYA\nwv 9 10\nAP %O N51\u00b039'47\u00b0E Sis ao\n2\nQo\noS\nOp\n419\nO\u00bb Sy.\nwy YA\n108\nOp. nV\nae ~ %O\nSS\neS O Rey\nCO\nQ Sa)\nC139 | 570.00\"\nO> 190\noS | 39\nKo)\n> \u00a3\nNO 57 79\nO-*\nY\n107\nOp. Orne\nSS\u00bb AP O SS Oo\np>\nee O>\n4\n4\n199 % N %O\nO-* YA\nwv Oy\n106 Op Or NX\n%O Xv\n\u201cgq SS\u00bb ap\nAs\n%\nLY N\n122 %\nYA nv\nNOD\nNye. ao\nSS\u00bb O\na) LS\nO> S\nSS\nO94 493 0\nY NY Op.\nS's\nss\nOp\nO> 194\nNeo S05.\n| 0482 | 650.00\"\nN\\%0\nXv Y\nNYO \u201cp\n% SS\n7s\n5 Op\nO>\nbY\nOn Op\nN %\nwv Y\n43 nO\nS>\nos\nO>\nOD. 126\nAV s\nao\nSy\nQO\nO> F\noY\nOp. 127\nS35>,\"20",
+  "lot_found": false
+}

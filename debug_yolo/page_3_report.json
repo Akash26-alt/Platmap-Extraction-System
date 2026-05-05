@@ -1,0 +1,20 @@
+{
+  "page_number": 3,
+  "detections": [
+    {
+      "class": "page_no",
+      "confidence": 0.83243727684021,
+      "bbox": [
+        8976,
+        89,
+        9837,
+        305
+      ],
+      "ocr_text": "34"
+    }
+  ],
+  "ocr_extracted": {
+    "platbook": null,
+    "page": "34"
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "lot_number": "106",
+  "block_number": "",
+  "extraction_timestamp": "2026-03-19T13:09:21.790864",
+  "county": "Pasco",
+  "state": "Florida",
+  "plat_book": "82",
+  "plat_page": "12b",
+  "subdivision": "Hidden Creek Phase 1 & 2",
+  "boundaries": {
+    "front": {
+      "bearing": "S 6 34 00 E",
+      "distance_ft": 50.0,
+      "street_name": "Shadadow Creek Dr",
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "rear": {
+      "bearing": "N 83 26 00 W",
+      "distance_ft": 120.0,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "left_side": {
+      "bearing": "N 6 34 00 W",
+      "distance_ft": 120.0,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "right_side": {
+      "bearing": "S 83 26 00 E",
+      "distance_ft": 50.0,
+      "is_curve": false,
+      "curve_refs": []
+    }
+  },
+  "curves": [],
+  "easements": [
+    {
+      "type": "UE",
+      "width": 10.0
+    },
+    {
+      "type": "DE",
+      "width": 20.0
+    }
+  ],
+  "special_features": [
+    {
+      "type": "CST"
+    }
+  ],
+  "needs_review": [],
+  "extraction_confidence": "high",
+  "source_file": "plats/plat8.pdf",
+  "page_number": 0,
+  "model_used": "meta-llama/llama-4-scout-17b-16e-instruct"
+}

@@ -1,0 +1,49 @@
+{
+  "lot_number": "109",
+  "block_number": "",
+  "extraction_timestamp": "2026-03-20T08:36:21.231368",
+  "county": "",
+  "state": "",
+  "plat_book": "",
+  "plat_page": "",
+  "subdivision": "",
+  "boundaries": {
+    "front": {
+      "bearing": "N36\u00b053'00\"E",
+      "distance_ft": 120.0,
+      "street_name": "",
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "rear": {
+      "bearing": "S36\u00b053'00\"W",
+      "distance_ft": 120.0,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "left_side": {
+      "bearing": "S53\u00b007'00\"W",
+      "distance_ft": 40.0,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "right_side": {
+      "bearing": "N53\u00b007'00\"E",
+      "distance_ft": 40.0,
+      "is_curve": false,
+      "curve_refs": []
+    }
+  },
+  "curves": [],
+  "easements": [],
+  "special_features": [],
+  "needs_review": [],
+  "extraction_confidence": "",
+  "source_file": "plats/plat8.pdf",
+  "page_number": 0,
+  "model_used": "google/gemma-3-27b-it:free",
+  "tile_hint": [
+    2,
+    2
+  ]
+}

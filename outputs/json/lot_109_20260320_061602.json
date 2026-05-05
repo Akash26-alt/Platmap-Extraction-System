@@ -1,0 +1,46 @@
+{
+  "lot_number": "109",
+  "block_number": "",
+  "extraction_timestamp": "2026-03-20T06:16:02.702671",
+  "county": "",
+  "state": "",
+  "plat_book": "",
+  "plat_page": "",
+  "subdivision": "",
+  "boundaries": {
+    "front": {
+      "bearing": "S89\u00b027'00\"E",
+      "distance_ft": 80.0,
+      "street_name": "",
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "rear": {
+      "bearing": "N89\u00b033'00\"W",
+      "distance_ft": 84.24,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "left_side": {
+      "bearing": "N00\u00b036'00\"E",
+      "distance_ft": 120.0,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "right_side": {
+      "bearing": "S00\u00b043'00\"W",
+      "distance_ft": 120.0,
+      "is_curve": false,
+      "curve_refs": []
+    }
+  },
+  "curves": [],
+  "easements": [],
+  "special_features": [],
+  "needs_review": [],
+  "extraction_confidence": "",
+  "source_file": "plats/plat8.pdf",
+  "page_number": 0,
+  "model_used": "meta-llama/llama-4-scout-17b-16e-instruct",
+  "lot_found": false
+}

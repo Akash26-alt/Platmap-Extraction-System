@@ -1,0 +1,21 @@
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.dll
+*.pyd
+
+# IDE
+.vscode/
+.idea/
+
+# Large data files
+*.bin
+*.pkl
+*.h5
+*.model

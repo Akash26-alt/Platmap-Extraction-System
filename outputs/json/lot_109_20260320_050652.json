@@ -1,0 +1,48 @@
+{
+  "lot_number": "109",
+  "block_number": "",
+  "extraction_timestamp": "2026-03-20T05:06:52.808818",
+  "county": "",
+  "state": "",
+  "plat_book": "82",
+  "plat_page": "12b",
+  "subdivision": "Hidden Creek Phase 1 & 2",
+  "boundaries": {
+    "front": {
+      "bearing": "S89\u00b015'29\"E",
+      "distance_ft": 20.0,
+      "street_name": "Shadow Fern Lane",
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "rear": {
+      "bearing": "N89\u00b009'37\"W",
+      "distance_ft": 20.0,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "left_side": {
+      "bearing": "N00\u00b010'24\"E",
+      "distance_ft": 60.0,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "right_side": {
+      "bearing": "S00\u00b010'26\"W",
+      "distance_ft": 60.0,
+      "is_curve": false,
+      "curve_refs": []
+    }
+  },
+  "curves": [],
+  "easements": [],
+  "special_features": [],
+  "needs_review": [],
+  "extraction_confidence": "",
+  "source_file": "plats/plat8.pdf",
+  "page_number": 0,
+  "model_used": "meta-llama/llama-4-scout-17b-16e-instruct",
+  "text_extracted": false,
+  "lot_bbox": null,
+  "nearby_text": ""
+}

@@ -1,0 +1,8 @@
+{
+  "error": "OpenRouter API error: Error code: 400 - {'error': {'message': 'nvidia/nemotron-nano-vl-8b-v1:free is not a valid model ID', 'code': 400}, 'user_id': 'user_3BCWDGfIy0QS6Jr1ljEzGq8tgUZ'}",
+  "lot_number": "109",
+  "extraction_confidence": "low",
+  "needs_review": [
+    "entire_extraction"
+  ]
+}

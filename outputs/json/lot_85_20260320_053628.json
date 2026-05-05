@@ -1,0 +1,46 @@
+{
+  "lot_number": "85",
+  "block_number": "",
+  "extraction_timestamp": "2026-03-20T05:36:28.642423",
+  "county": "",
+  "state": "",
+  "plat_book": "",
+  "plat_page": "",
+  "subdivision": "",
+  "boundaries": {
+    "front": {
+      "bearing": "N72\u00b054'00\"E",
+      "distance_ft": 60.0,
+      "street_name": "San Mateo Boulevard",
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "rear": {
+      "bearing": "S72\u00b053'00\"W",
+      "distance_ft": 60.0,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "left_side": {
+      "bearing": "N17\u00b006'00\"W",
+      "distance_ft": 131.45,
+      "is_curve": false,
+      "curve_refs": []
+    },
+    "right_side": {
+      "bearing": "S17\u00b007'00\"E",
+      "distance_ft": 131.37,
+      "is_curve": false,
+      "curve_refs": []
+    }
+  },
+  "curves": [],
+  "easements": [],
+  "special_features": [],
+  "needs_review": [],
+  "extraction_confidence": "",
+  "source_file": "plats/plat4.pdf",
+  "page_number": 0,
+  "model_used": "meta-llama/llama-4-scout-17b-16e-instruct",
+  "lot_bbox": null
+}
