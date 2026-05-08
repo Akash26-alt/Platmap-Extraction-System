@@ -1,0 +1,27 @@
+{
+  "error": "Expecting ',' delimiter: line 8 column 29 (char 157)",
+  "raw_response": "```json\n{\n  \"lot_number\": \"31\",\n  \"block_number\": \"0\",\n  \"boundaries\": [\n    {\n      \"segment_number\": 1,\n      \"type\": \"line_OR_curve\",\n      \"bearing\": \"N45\u00b012'36\"E\",\n      \"distance\": 80.00,\n      \"curve_number\": \"\",\n      \"radius\": null,\n      \"arc_length\": null,\n      \"delta\": \"\",\n      \"chord_bearing\": \"\",\n      \"chord_distance\": null,\n      \"table_reference\": \"\"\n    },\n    {\n      \"segment_number\": 2,\n      \"type\": \"line_OR_curve\",\n      \"bearing\": \"S30\u00b045'18\"W\",\n      \"distance\": 60.00,\n",
+  "needs_review": [
+    "entire_extraction"
+  ],
+  "extraction_confidence": "low",
+  "extraction_timestamp": "2026-05-08T11:47:28.125128",
+  "model_used": "blaifa/InternVL3",
+  "lot_number": "31",
+  "block_number": "0",
+  "inference_time_sec": 164.0,
+  "extractor_used": "internvl",
+  "fallback_reason": "claude_unavailable",
+  "source_file": "C:\\Users\\11119\\AppData\\Local\\Temp\\tmp6uf94ki5.pdf",
+  "page_number": 0,
+  "crops_generated": [
+    "lot",
+    "curve_table_1",
+    "curve_table_2",
+    "curve_table_3",
+    "curve_table_4"
+  ],
+  "yolo_detections": 6,
+  "lot_detector_used": "yolo_ocr",
+  "lot_snapshot": "f4f469cc-e0a9-4eed-bf2e-8d6000b9c8af.jpg"
+}

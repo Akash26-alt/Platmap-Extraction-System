@@ -1,0 +1,619 @@
+2026-05-07 11:37:59 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-07 11:37:59 [INFO] platmap.db: Database tables ready
+2026-05-07 11:37:59 [INFO] platmap.main: Database connected
+2026-05-07 11:42:48 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-07 11:42:48 [INFO] platmap.db: Database tables ready
+2026-05-07 11:42:48 [INFO] platmap.main: Database connected
+2026-05-07 11:44:29 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-07 11:44:29 [INFO] platmap.db: Database tables ready
+2026-05-07 11:44:29 [INFO] platmap.main: Database connected
+2026-05-07 12:07:23 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-07 12:07:23 [INFO] platmap.db: Database tables ready
+2026-05-07 12:07:23 [INFO] platmap.main: Database connected
+2026-05-07 12:07:29 [INFO] platmap.main: Extractor initialized
+2026-05-07 12:07:29 [INFO] platmap.main: System ready
+2026-05-07 12:08:03 [INFO] platmap.main: [9515aa2d] GET /
+2026-05-07 12:08:03 [INFO] platmap.main: [0928230c] GET /favicon.ico
+2026-05-07 12:08:08 [INFO] platmap.main: [6b27eba1] GET /docs
+2026-05-07 12:08:08 [INFO] platmap.main: [b17d39b7] GET /openapi.json
+2026-05-07 12:17:08 [INFO] platmap.main: [1b62ddd8] POST /api/v1/extract
+2026-05-07 12:17:08 [INFO] platmap.routes: [1b62ddd8] Job 904bcd86-6c8d-49c2-9078-27b5748e4857 created for Lot 37 Book 82 Page 122
+2026-05-07 12:17:08 [INFO] platmap.routes: [904bcd86-6c8d-49c2-9078-27b5748e4857] Extraction started for Lot 37 Book 82 Page 122
+2026-05-07 12:17:20 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-07 12:17:20 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-07 12:17:20 [WARNING] platmap.routes: Attempt 1 failed: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011Canm3AA2wNAcU1aFegpTB'}. Retrying in 2s...
+2026-05-07 12:17:35 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-07 12:17:35 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-07 12:17:35 [WARNING] platmap.routes: Attempt 2 failed: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011Canm4EuZjD7Yddr8mYuc8'}. Retrying in 4s...
+2026-05-07 12:17:51 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-07 12:17:52 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-07 12:17:52 [ERROR] platmap.routes: All 3 attempts failed
+2026-05-07 12:17:52 [ERROR] platmap.routes: [904bcd86-6c8d-49c2-9078-27b5748e4857] Extraction failed: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011Canm5SwtJFLrdX83FKWUK'}
+Traceback (most recent call last):
+  File "C:\Users\11119\Desktop\Platmap_Extraction_System\api\routes.py", line 198, in _run_extraction
+    result = _extract_with_retry(extractor, tmp_path, inputs)
+  File "C:\Users\11119\Desktop\Platmap_Extraction_System\api\routes.py", line 271, in _extract_with_retry
+    raise last_error
+  File "C:\Users\11119\Desktop\Platmap_Extraction_System\api\routes.py", line 253, in _extract_with_retry
+    return extractor.extract(
+  File "C:\Users\11119\Desktop\Platmap_Extraction_System\extractor\platmap_extractor_yolo.py", line 948, in extract
+    result = extract_with_claude(
+  File "C:\Users\11119\Desktop\Platmap_Extraction_System\extractor\platmap_extractor_yolo.py", line 759, in extract_with_claude
+    response = claude_client.messages.create(
+  File "C:\Users\11119\Desktop\Platmap_Extraction_System\venv\lib\site-packages\anthropic\_utils\_utils.py", line 294, in wrapper
+    return func(*args, **kwargs)
+  File "C:\Users\11119\Desktop\Platmap_Extraction_System\venv\lib\site-packages\anthropic\resources\messages\messages.py", line 1003, in create
+    return self._post(
+  File "C:\Users\11119\Desktop\Platmap_Extraction_System\venv\lib\site-packages\anthropic\_base_client.py", line 1373, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+  File "C:\Users\11119\Desktop\Platmap_Extraction_System\venv\lib\site-packages\anthropic\_base_client.py", line 1146, in request
+    raise self._make_status_error_from_response(err.response) from None
+anthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011Canm5SwtJFLrdX83FKWUK'}
+2026-05-07 14:15:29 [INFO] platmap.main: Shutting down...
+2026-05-07 14:15:29 [INFO] platmap.main: Shutdown complete
+2026-05-07 14:15:40 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-07 14:15:41 [INFO] platmap.db: Database tables ready
+2026-05-07 14:15:41 [INFO] platmap.main: Database connected
+2026-05-07 14:15:47 [INFO] platmap.main: Extractor initialized
+2026-05-07 14:15:47 [INFO] platmap.main: System ready
+2026-05-07 14:15:53 [INFO] platmap.main: [d59a1e24] GET /docs
+2026-05-07 14:15:54 [INFO] platmap.main: [6ee6e9c8] GET /openapi.json
+2026-05-07 14:16:26 [INFO] platmap.main: [dccc7dc6] POST /api/v1/extract
+2026-05-07 14:16:26 [INFO] platmap.routes: [dccc7dc6] Job 7ba0c093-4fc0-49fd-a10f-60c108edc01c created for Lot 37 Book 82 Page 122
+2026-05-07 14:16:26 [INFO] platmap.routes: [7ba0c093-4fc0-49fd-a10f-60c108edc01c] Extraction started for Lot 37 Book 82 Page 122
+2026-05-07 14:16:38 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-07 14:16:39 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-07 14:19:41 [INFO] ezdxf: creating ACAD_COLOR dictionary
+2026-05-07 14:19:41 [INFO] ezdxf: creating ACAD_GROUP dictionary
+2026-05-07 14:19:41 [INFO] ezdxf: creating ACAD_LAYOUT dictionary
+2026-05-07 14:19:41 [INFO] ezdxf: creating ACAD_MATERIAL dictionary
+2026-05-07 14:19:41 [INFO] ezdxf: creating ACAD_MLEADERSTYLE dictionary
+2026-05-07 14:19:41 [INFO] ezdxf: creating ACAD_MLINESTYLE dictionary
+2026-05-07 14:19:41 [INFO] ezdxf: creating ACAD_PLOTSETTINGS dictionary
+2026-05-07 14:19:41 [INFO] ezdxf: creating ACAD_PLOTSTYLENAME dictionary
+2026-05-07 14:19:41 [INFO] ezdxf: creating ACAD_SCALELIST dictionary
+2026-05-07 14:19:41 [INFO] ezdxf: creating ACAD_TABLESTYLE dictionary
+2026-05-07 14:19:41 [INFO] ezdxf: creating ACAD_VISUALSTYLE dictionary
+2026-05-07 14:19:41 [WARNING] platmap.routes: [7ba0c093-4fc0-49fd-a10f-60c108edc01c] DXF generation failed: module 'ezdxf.units' has no attribute 'FEET'
+2026-05-07 14:19:41 [INFO] platmap.db: Extraction saved: 6d8fa250-2bf7-49c0-bf3a-5564f276234c
+2026-05-07 14:19:41 [INFO] platmap.routes: [7ba0c093-4fc0-49fd-a10f-60c108edc01c] Done. Confidence: low
+2026-05-07 14:55:58 [INFO] platmap.main: [c8275686] GET /docs
+2026-05-07 14:55:58 [INFO] platmap.main: [56624223] GET /openapi.json
+2026-05-07 15:28:43 [INFO] platmap.main: [5af7f796] POST /api/v1/extract
+2026-05-07 15:28:43 [INFO] platmap.routes: [5af7f796] Job 55c1b79e-ef2e-4d8b-8d57-701396d08b46 created for Lot 37 Book 82 Page 122
+2026-05-07 15:28:43 [INFO] platmap.routes: [55c1b79e-ef2e-4d8b-8d57-701396d08b46] Extraction started for Lot 37 Book 82 Page 122
+2026-05-07 15:28:55 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-07 15:31:57 [INFO] ezdxf: creating ACAD_COLOR dictionary
+2026-05-07 15:31:57 [INFO] ezdxf: creating ACAD_GROUP dictionary
+2026-05-07 15:31:57 [INFO] ezdxf: creating ACAD_LAYOUT dictionary
+2026-05-07 15:31:57 [INFO] ezdxf: creating ACAD_MATERIAL dictionary
+2026-05-07 15:31:57 [INFO] ezdxf: creating ACAD_MLEADERSTYLE dictionary
+2026-05-07 15:31:57 [INFO] ezdxf: creating ACAD_MLINESTYLE dictionary
+2026-05-07 15:31:57 [INFO] ezdxf: creating ACAD_PLOTSETTINGS dictionary
+2026-05-07 15:31:57 [INFO] ezdxf: creating ACAD_PLOTSTYLENAME dictionary
+2026-05-07 15:31:57 [INFO] ezdxf: creating ACAD_SCALELIST dictionary
+2026-05-07 15:31:57 [INFO] ezdxf: creating ACAD_TABLESTYLE dictionary
+2026-05-07 15:31:57 [INFO] ezdxf: creating ACAD_VISUALSTYLE dictionary
+2026-05-07 15:31:57 [WARNING] platmap.routes: [55c1b79e-ef2e-4d8b-8d57-701396d08b46] DXF generation failed: module 'ezdxf.units' has no attribute 'FEET'
+2026-05-07 15:31:57 [INFO] platmap.db: Extraction saved: 0b6a59f9-b61a-4553-bece-ddcf94cc6f34
+2026-05-07 15:31:57 [INFO] platmap.routes: [55c1b79e-ef2e-4d8b-8d57-701396d08b46] Done. Confidence: low
+2026-05-07 15:36:12 [INFO] platmap.main: Shutting down...
+2026-05-07 15:36:12 [INFO] platmap.main: Shutdown complete
+2026-05-07 15:36:37 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-07 15:36:37 [INFO] platmap.db: Database tables ready
+2026-05-07 15:36:37 [INFO] platmap.main: Database connected
+2026-05-07 15:36:45 [INFO] platmap.main: Extractor initialized
+2026-05-07 15:36:45 [INFO] platmap.main: System ready
+2026-05-07 15:36:50 [INFO] platmap.main: [c3d5c920] GET /docs
+2026-05-07 15:36:50 [INFO] platmap.main: [089a4e3a] GET /openapi.json
+2026-05-07 15:36:53 [INFO] platmap.main: [4bfd3a1c] GET /docs
+2026-05-07 15:36:53 [INFO] platmap.main: [7aa19506] GET /openapi.json
+2026-05-07 15:37:17 [INFO] platmap.main: [df7e7c05] POST /api/v1/extract
+2026-05-07 15:37:17 [INFO] platmap.routes: [df7e7c05] Job 60af5bfa-93ab-4576-9a52-f8b6c44bbfd7 created for Lot 37 Book 82 Page 122
+2026-05-07 15:37:17 [INFO] platmap.routes: [60af5bfa-93ab-4576-9a52-f8b6c44bbfd7] Extraction started for Lot 37 Book 82 Page 122
+2026-05-07 15:37:29 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-07 15:37:30 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-07 15:41:06 [INFO] ezdxf: creating ACAD_COLOR dictionary
+2026-05-07 15:41:06 [INFO] ezdxf: creating ACAD_GROUP dictionary
+2026-05-07 15:41:06 [INFO] ezdxf: creating ACAD_LAYOUT dictionary
+2026-05-07 15:41:06 [INFO] ezdxf: creating ACAD_MATERIAL dictionary
+2026-05-07 15:41:06 [INFO] ezdxf: creating ACAD_MLEADERSTYLE dictionary
+2026-05-07 15:41:06 [INFO] ezdxf: creating ACAD_MLINESTYLE dictionary
+2026-05-07 15:41:06 [INFO] ezdxf: creating ACAD_PLOTSETTINGS dictionary
+2026-05-07 15:41:06 [INFO] ezdxf: creating ACAD_PLOTSTYLENAME dictionary
+2026-05-07 15:41:06 [INFO] ezdxf: creating ACAD_SCALELIST dictionary
+2026-05-07 15:41:06 [INFO] ezdxf: creating ACAD_TABLESTYLE dictionary
+2026-05-07 15:41:06 [INFO] ezdxf: creating ACAD_VISUALSTYLE dictionary
+2026-05-07 15:41:06 [WARNING] platmap.routes: [60af5bfa-93ab-4576-9a52-f8b6c44bbfd7] DXF generation failed: a bytes-like object is required, not 'str'
+2026-05-07 15:41:06 [INFO] platmap.db: Extraction saved: 39cb1232-78e6-42b7-959d-cb585b6a0174
+2026-05-07 15:41:06 [INFO] platmap.routes: [60af5bfa-93ab-4576-9a52-f8b6c44bbfd7] Done. Confidence: low
+2026-05-07 16:07:09 [INFO] platmap.main: Shutting down...
+2026-05-07 16:07:09 [INFO] platmap.main: Shutdown complete
+2026-05-07 16:07:13 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-07 16:07:13 [INFO] platmap.db: Database tables ready
+2026-05-07 16:07:13 [INFO] platmap.main: Database connected
+2026-05-07 16:07:21 [INFO] platmap.main: Extractor initialized
+2026-05-07 16:07:21 [INFO] platmap.main: System ready
+2026-05-07 16:07:26 [INFO] platmap.main: [2ea5e6a6] GET /docs
+2026-05-07 16:07:26 [INFO] platmap.main: [cd424e8a] GET /openapi.json
+2026-05-07 16:07:28 [INFO] platmap.main: [50ef24a4] GET /docs
+2026-05-07 16:07:28 [INFO] platmap.main: [1078edf7] GET /openapi.json
+2026-05-07 16:07:55 [INFO] platmap.main: [3caabef4] POST /api/v1/extract
+2026-05-07 16:07:55 [INFO] platmap.routes: [3caabef4] Job 0cbbf5d1-e394-416c-ab5c-f62258f94bd5 created for Lot 37 Book 82 Page 122
+2026-05-07 16:07:55 [INFO] platmap.routes: [0cbbf5d1-e394-416c-ab5c-f62258f94bd5] Extraction started for Lot 37 Book 82 Page 122
+2026-05-07 16:08:08 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-07 16:08:08 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-07 16:11:47 [INFO] ezdxf: creating ACAD_COLOR dictionary
+2026-05-07 16:11:47 [INFO] ezdxf: creating ACAD_GROUP dictionary
+2026-05-07 16:11:47 [INFO] ezdxf: creating ACAD_LAYOUT dictionary
+2026-05-07 16:11:47 [INFO] ezdxf: creating ACAD_MATERIAL dictionary
+2026-05-07 16:11:47 [INFO] ezdxf: creating ACAD_MLEADERSTYLE dictionary
+2026-05-07 16:11:47 [INFO] ezdxf: creating ACAD_MLINESTYLE dictionary
+2026-05-07 16:11:47 [INFO] ezdxf: creating ACAD_PLOTSETTINGS dictionary
+2026-05-07 16:11:47 [INFO] ezdxf: creating ACAD_PLOTSTYLENAME dictionary
+2026-05-07 16:11:47 [INFO] ezdxf: creating ACAD_SCALELIST dictionary
+2026-05-07 16:11:47 [INFO] ezdxf: creating ACAD_TABLESTYLE dictionary
+2026-05-07 16:11:47 [INFO] ezdxf: creating ACAD_VISUALSTYLE dictionary
+2026-05-07 16:11:47 [INFO] ezdxf: did not write header var $INTERFEREOBJVS, value is None.
+2026-05-07 16:11:47 [INFO] ezdxf: did not write header var $INTERFEREVPVS, value is None.
+2026-05-07 16:11:47 [INFO] platmap.routes: [0cbbf5d1-e394-416c-ab5c-f62258f94bd5] DXF saved: outputs\dxf\27b57988-c542-40cb-8ef9-3dffe4fcaac2.dxf
+2026-05-07 16:11:47 [INFO] platmap.db: Extraction saved: 27b57988-c542-40cb-8ef9-3dffe4fcaac2
+2026-05-07 16:11:47 [INFO] platmap.routes: [0cbbf5d1-e394-416c-ab5c-f62258f94bd5] Done. Confidence: low
+2026-05-08 11:09:45 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-08 11:09:45 [INFO] platmap.db: Database tables ready
+2026-05-08 11:09:45 [INFO] platmap.main: Database connected
+2026-05-08 11:09:54 [INFO] platmap.main: Extractor initialized
+2026-05-08 11:09:54 [INFO] platmap.main: System ready
+2026-05-08 11:10:11 [INFO] platmap.main: [e17e0c30] GET /
+2026-05-08 11:10:11 [INFO] platmap.main: [9e6e1c7c] GET /favicon.ico
+2026-05-08 11:10:16 [INFO] platmap.main: [f605f9a6] GET /docs
+2026-05-08 11:10:16 [INFO] platmap.main: [ef733808] GET /openapi.json
+2026-05-08 11:11:20 [INFO] platmap.main: [79550a8b] POST /api/v1/extract
+2026-05-08 11:11:20 [INFO] platmap.routes: [79550a8b] Job 91b910a8-723b-40b7-a01c-a257098cea85 created for Lot 37 Book 82 Page 122
+2026-05-08 11:11:20 [INFO] platmap.routes: [91b910a8-723b-40b7-a01c-a257098cea85] Extraction started for Lot 37 Book 82 Page 122
+2026-05-08 11:11:33 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 11:11:34 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 11:14:42 [INFO] platmap.dxf: Generating DXF for Lot 37
+2026-05-08 11:14:42 [INFO] ezdxf: creating ACAD_COLOR dictionary
+2026-05-08 11:14:42 [INFO] ezdxf: creating ACAD_GROUP dictionary
+2026-05-08 11:14:42 [INFO] ezdxf: creating ACAD_LAYOUT dictionary
+2026-05-08 11:14:42 [INFO] ezdxf: creating ACAD_MATERIAL dictionary
+2026-05-08 11:14:42 [INFO] ezdxf: creating ACAD_MLEADERSTYLE dictionary
+2026-05-08 11:14:42 [INFO] ezdxf: creating ACAD_MLINESTYLE dictionary
+2026-05-08 11:14:42 [INFO] ezdxf: creating ACAD_PLOTSETTINGS dictionary
+2026-05-08 11:14:42 [INFO] ezdxf: creating ACAD_PLOTSTYLENAME dictionary
+2026-05-08 11:14:42 [INFO] ezdxf: creating ACAD_SCALELIST dictionary
+2026-05-08 11:14:42 [INFO] ezdxf: creating ACAD_TABLESTYLE dictionary
+2026-05-08 11:14:42 [INFO] ezdxf: creating ACAD_VISUALSTYLE dictionary
+2026-05-08 11:14:42 [WARNING] platmap.routes: [91b910a8-723b-40b7-a01c-a257098cea85] DXF generation failed: No boundary segments found for Lot 37
+2026-05-08 11:14:42 [INFO] platmap.db: Extraction saved: 630f1731-9067-40f2-98c1-6f792a447d54
+2026-05-08 11:14:42 [INFO] platmap.routes: [91b910a8-723b-40b7-a01c-a257098cea85] Done. Confidence: low
+2026-05-08 11:23:34 [INFO] platmap.main: Shutting down...
+2026-05-08 11:23:34 [INFO] platmap.main: Shutdown complete
+2026-05-08 14:06:44 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-08 14:06:44 [INFO] platmap.db: Database tables ready
+2026-05-08 14:06:44 [INFO] platmap.main: Database connected
+2026-05-08 14:06:51 [INFO] platmap.main: Extractor initialized
+2026-05-08 14:06:51 [INFO] platmap.main: System ready
+2026-05-08 14:06:56 [INFO] platmap.main: [33f29117] GET /docs
+2026-05-08 14:06:56 [INFO] platmap.main: [54ce8775] GET /openapi.json
+2026-05-08 14:07:09 [INFO] platmap.main: [5a8e756e] GET /api/v1/extraction/630f1731-9067-40f2-98c1-6f792a447d54
+2026-05-08 14:09:29 [INFO] platmap.main: [abfce5e8] GET /api/v1/corrections/630f1731-9067-40f2-98c1-6f792a447d54
+2026-05-08 14:10:33 [INFO] platmap.main: [9cf8b3de] GET /api/v1/health
+2026-05-08 14:45:32 [INFO] platmap.main: Shutting down...
+2026-05-08 14:45:32 [INFO] platmap.main: Shutdown complete
+2026-05-08 14:45:40 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-08 14:45:40 [INFO] platmap.db: Database tables ready
+2026-05-08 14:45:40 [INFO] platmap.main: Database connected
+2026-05-08 14:45:46 [INFO] platmap.main: Extractor initialized
+2026-05-08 14:45:46 [INFO] platmap.main: System ready
+2026-05-08 14:46:13 [INFO] platmap.main: Shutting down...
+2026-05-08 14:46:13 [INFO] platmap.main: Shutdown complete
+2026-05-08 14:46:21 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-08 14:46:21 [INFO] platmap.db: Database tables ready
+2026-05-08 14:46:21 [INFO] platmap.main: Database connected
+2026-05-08 14:46:29 [INFO] platmap.main: Extractor initialized
+2026-05-08 14:46:29 [INFO] platmap.main: System ready
+2026-05-08 14:46:57 [INFO] platmap.main: [7a45c186] GET /docs
+2026-05-08 14:46:57 [INFO] platmap.main: [c523b991] GET /openapi.json
+2026-05-08 14:46:58 [INFO] platmap.main: [34d85dd1] GET /docs
+2026-05-08 14:46:58 [INFO] platmap.main: [f6f6bfc9] GET /openapi.json
+2026-05-08 14:46:58 [INFO] platmap.main: [41effcbe] GET /docs
+2026-05-08 14:46:58 [INFO] platmap.main: [bd476984] GET /openapi.json
+2026-05-08 14:46:58 [INFO] platmap.main: [51035385] GET /docs
+2026-05-08 14:46:58 [INFO] platmap.main: [4533b0d1] GET /openapi.json
+2026-05-08 14:46:58 [INFO] platmap.main: [ea452344] GET /docs
+2026-05-08 14:46:59 [INFO] platmap.main: [e5190ba5] GET /openapi.json
+2026-05-08 14:46:59 [INFO] platmap.main: [1f178f69] GET /docs
+2026-05-08 14:46:59 [INFO] platmap.main: [c13770c0] GET /openapi.json
+2026-05-08 14:48:27 [INFO] platmap.main: [29fae27c] POST /api/v1/extract
+2026-05-08 14:48:27 [INFO] platmap.routes: [29fae27c] Job a9e77a74-7528-49be-b1c5-96aca194f0b1 created for Lot 40 Book 82 Page 122
+2026-05-08 14:48:27 [INFO] platmap.routes: [a9e77a74-7528-49be-b1c5-96aca194f0b1] Extraction started for Lot 40 Book 82 Page 122
+2026-05-08 14:48:40 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 14:48:40 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 14:48:40 [INFO] anthropic._base_client: Retrying request to /v1/messages in 0.483045 seconds
+2026-05-08 14:48:42 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 502 Bad Gateway"
+2026-05-08 14:48:42 [INFO] anthropic._base_client: Retrying request to /v1/messages in 0.777737 seconds
+2026-05-08 14:48:43 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 502 Bad Gateway"
+2026-05-08 14:49:50 [INFO] platmap.routes: [a9e77a74-7528-49be-b1c5-96aca194f0b1] JSON saved: outputs\json\c9237114-c22a-4683-ba14-907e746a2369.json
+2026-05-08 14:49:50 [INFO] platmap.dxf: Generating DXF for Lot 40
+2026-05-08 14:49:50 [INFO] ezdxf: creating ACAD_COLOR dictionary
+2026-05-08 14:49:50 [INFO] ezdxf: creating ACAD_GROUP dictionary
+2026-05-08 14:49:50 [INFO] ezdxf: creating ACAD_LAYOUT dictionary
+2026-05-08 14:49:50 [INFO] ezdxf: creating ACAD_MATERIAL dictionary
+2026-05-08 14:49:50 [INFO] ezdxf: creating ACAD_MLEADERSTYLE dictionary
+2026-05-08 14:49:50 [INFO] ezdxf: creating ACAD_MLINESTYLE dictionary
+2026-05-08 14:49:50 [INFO] ezdxf: creating ACAD_PLOTSETTINGS dictionary
+2026-05-08 14:49:50 [INFO] ezdxf: creating ACAD_PLOTSTYLENAME dictionary
+2026-05-08 14:49:50 [INFO] ezdxf: creating ACAD_SCALELIST dictionary
+2026-05-08 14:49:50 [INFO] ezdxf: creating ACAD_TABLESTYLE dictionary
+2026-05-08 14:49:50 [INFO] ezdxf: creating ACAD_VISUALSTYLE dictionary
+2026-05-08 14:49:50 [INFO] platmap.dxf: Drawing 2 boundary segment(s)
+2026-05-08 14:49:50 [WARNING] platmap.dxf: Segment 2 (seg_2): missing curve data — skipped
+2026-05-08 14:49:50 [INFO] platmap.dxf: Segments: 1 drawn, 1 skipped
+2026-05-08 14:49:50 [WARNING] platmap.dxf: Closure error: 120.50ft (tolerance 1.0ft) — adding closing line
+2026-05-08 14:49:50 [INFO] ezdxf: did not write header var $INTERFEREOBJVS, value is None.
+2026-05-08 14:49:50 [INFO] ezdxf: did not write header var $INTERFEREVPVS, value is None.
+2026-05-08 14:49:50 [INFO] platmap.dxf: DXF generated: 15KB
+2026-05-08 14:49:50 [WARNING] platmap.routes: [a9e77a74-7528-49be-b1c5-96aca194f0b1] DXF generation failed: memoryview: a bytes-like object is required, not 'str'
+2026-05-08 14:49:50 [INFO] platmap.db: Extraction saved: c9237114-c22a-4683-ba14-907e746a2369
+2026-05-08 14:49:50 [INFO] platmap.routes: [a9e77a74-7528-49be-b1c5-96aca194f0b1] Done. Confidence: high
+2026-05-08 14:54:29 [INFO] platmap.main: [8c13180c] GET /api/v1/extraction/c9237114-c22a-4683-ba14-907e746a2369
+2026-05-08 14:57:34 [INFO] platmap.main: [62093321] GET /api/v1/lot-snapshot/c9237114-c22a-4683-ba14-907e746a2369
+2026-05-08 16:24:15 [INFO] platmap.main: [a295f196] GET /api/v1/corrections/template/c9237114-c22a-4683-ba14-907e746a2369
+2026-05-08 16:35:43 [INFO] platmap.main: Shutting down...
+2026-05-08 16:35:43 [INFO] platmap.main: Shutdown complete
+2026-05-08 16:44:11 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-08 16:44:11 [INFO] platmap.db: Database tables ready
+2026-05-08 16:44:11 [INFO] platmap.main: Database connected
+2026-05-08 16:44:21 [INFO] platmap.main: Extractor initialized
+2026-05-08 16:44:21 [INFO] platmap.main: System ready
+2026-05-08 16:44:27 [INFO] platmap.main: [e852a640] GET /docs
+2026-05-08 16:44:27 [INFO] platmap.main: [2b0e1ded] GET /openapi.json
+2026-05-08 16:44:27 [INFO] platmap.main: [494a66f9] GET /docs
+2026-05-08 16:44:27 [INFO] platmap.main: [578d1c84] GET /openapi.json
+2026-05-08 16:44:28 [INFO] platmap.main: [7939c3c1] GET /docs
+2026-05-08 16:44:28 [INFO] platmap.main: [1d8a1887] GET /openapi.json
+2026-05-08 16:44:28 [INFO] platmap.main: [e4d42732] GET /docs
+2026-05-08 16:44:28 [INFO] platmap.main: [6b63d5fb] GET /openapi.json
+2026-05-08 16:46:40 [INFO] platmap.main: [bdacc7eb] POST /api/v1/extract
+2026-05-08 16:46:40 [INFO] platmap.routes: [bdacc7eb] Job 4846e278-ece8-4470-b018-fa21ce2d0533 created for Lot 31 Book 82 Page 122
+2026-05-08 16:46:40 [INFO] platmap.routes: [4846e278-ece8-4470-b018-fa21ce2d0533] Extraction started for Lot 31 Book 82 Page 122
+2026-05-08 16:46:53 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 16:46:53 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 16:48:07 [INFO] platmap.routes: [4846e278-ece8-4470-b018-fa21ce2d0533] JSON saved: outputs\json\6db3b066-0409-422e-b71e-4526edf3bfa2.json
+2026-05-08 16:48:07 [INFO] platmap.dxf: Generating DXF for Lot 31
+2026-05-08 16:48:07 [INFO] ezdxf: creating ACAD_COLOR dictionary
+2026-05-08 16:48:07 [INFO] ezdxf: creating ACAD_GROUP dictionary
+2026-05-08 16:48:07 [INFO] ezdxf: creating ACAD_LAYOUT dictionary
+2026-05-08 16:48:07 [INFO] ezdxf: creating ACAD_MATERIAL dictionary
+2026-05-08 16:48:07 [INFO] ezdxf: creating ACAD_MLEADERSTYLE dictionary
+2026-05-08 16:48:07 [INFO] ezdxf: creating ACAD_MLINESTYLE dictionary
+2026-05-08 16:48:07 [INFO] ezdxf: creating ACAD_PLOTSETTINGS dictionary
+2026-05-08 16:48:07 [INFO] ezdxf: creating ACAD_PLOTSTYLENAME dictionary
+2026-05-08 16:48:07 [INFO] ezdxf: creating ACAD_SCALELIST dictionary
+2026-05-08 16:48:07 [INFO] ezdxf: creating ACAD_TABLESTYLE dictionary
+2026-05-08 16:48:07 [INFO] ezdxf: creating ACAD_VISUALSTYLE dictionary
+2026-05-08 16:48:07 [INFO] platmap.dxf: Drawing 2 boundary segment(s)
+2026-05-08 16:48:07 [WARNING] platmap.dxf: Segment 2 (seg_2): missing curve data — skipped
+2026-05-08 16:48:07 [INFO] platmap.dxf: Segments: 1 drawn, 1 skipped
+2026-05-08 16:48:07 [WARNING] platmap.dxf: Closure error: 120.50ft (tolerance 1.0ft) — adding closing line
+2026-05-08 16:48:07 [INFO] ezdxf: did not write header var $INTERFEREOBJVS, value is None.
+2026-05-08 16:48:07 [INFO] ezdxf: did not write header var $INTERFEREVPVS, value is None.
+2026-05-08 16:48:07 [INFO] platmap.routes: [4846e278-ece8-4470-b018-fa21ce2d0533] DXF saved: outputs\dxf\6db3b066-0409-422e-b71e-4526edf3bfa2.dxf
+2026-05-08 16:48:07 [INFO] platmap.db: Extraction saved: 6db3b066-0409-422e-b71e-4526edf3bfa2
+2026-05-08 16:48:07 [INFO] platmap.routes: [4846e278-ece8-4470-b018-fa21ce2d0533] Done. Confidence: high
+2026-05-08 16:58:30 [INFO] platmap.main: [105d8d1c] GET /api/v1/corrections/template/6db3b066-0409-422e-b71e-4526edf3bfa2
+2026-05-08 17:13:28 [INFO] platmap.main: Shutting down...
+2026-05-08 17:13:28 [INFO] platmap.main: Shutdown complete
+2026-05-08 17:13:41 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-08 17:13:41 [INFO] platmap.db: Database tables ready
+2026-05-08 17:13:41 [INFO] platmap.main: Database connected
+2026-05-08 17:13:51 [INFO] platmap.main: Extractor initialized
+2026-05-08 17:13:51 [INFO] platmap.main: System ready
+2026-05-08 17:13:55 [INFO] platmap.main: [87e60c97] GET /docs
+2026-05-08 17:13:55 [INFO] platmap.main: [81fe67c1] GET /openapi.json
+2026-05-08 17:13:55 [INFO] platmap.main: [c866914c] GET /docs
+2026-05-08 17:13:56 [INFO] platmap.main: [b59d5c6d] GET /openapi.json
+2026-05-08 17:13:56 [INFO] platmap.main: [50186056] GET /docs
+2026-05-08 17:13:56 [INFO] platmap.main: [29e38648] GET /openapi.json
+2026-05-08 17:13:56 [INFO] platmap.main: [054d0944] GET /docs
+2026-05-08 17:13:56 [INFO] platmap.main: [372b8622] GET /openapi.json
+2026-05-08 17:13:56 [INFO] platmap.main: [6897889b] GET /docs
+2026-05-08 17:13:56 [INFO] platmap.main: [ecb7592a] GET /openapi.json
+2026-05-08 17:13:56 [INFO] platmap.main: [edc84934] GET /docs
+2026-05-08 17:13:56 [INFO] platmap.main: [079355f1] GET /openapi.json
+2026-05-08 17:13:56 [INFO] platmap.main: [ba42b250] GET /docs
+2026-05-08 17:13:56 [INFO] platmap.main: [b36c360f] GET /openapi.json
+2026-05-08 17:14:31 [INFO] platmap.main: [1a6a7cdf] POST /api/v1/extract
+2026-05-08 17:14:31 [INFO] platmap.routes: [1a6a7cdf] Job b6e8613d-d9e0-4d0b-96fd-311b31e6cddb created for Lot 31 Book 82 Page 122
+2026-05-08 17:14:31 [INFO] platmap.routes: [b6e8613d-d9e0-4d0b-96fd-311b31e6cddb] Extraction started for Lot 31 Book 82 Page 122
+2026-05-08 17:14:43 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 17:14:44 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 17:17:28 [INFO] platmap.routes: [b6e8613d-d9e0-4d0b-96fd-311b31e6cddb] JSON saved: outputs\json\f4f469cc-e0a9-4eed-bf2e-8d6000b9c8af.json
+2026-05-08 17:17:28 [INFO] platmap.dxf: Generating DXF for Lot 31
+2026-05-08 17:17:28 [INFO] ezdxf: creating ACAD_COLOR dictionary
+2026-05-08 17:17:28 [INFO] ezdxf: creating ACAD_GROUP dictionary
+2026-05-08 17:17:28 [INFO] ezdxf: creating ACAD_LAYOUT dictionary
+2026-05-08 17:17:28 [INFO] ezdxf: creating ACAD_MATERIAL dictionary
+2026-05-08 17:17:28 [INFO] ezdxf: creating ACAD_MLEADERSTYLE dictionary
+2026-05-08 17:17:28 [INFO] ezdxf: creating ACAD_MLINESTYLE dictionary
+2026-05-08 17:17:28 [INFO] ezdxf: creating ACAD_PLOTSETTINGS dictionary
+2026-05-08 17:17:28 [INFO] ezdxf: creating ACAD_PLOTSTYLENAME dictionary
+2026-05-08 17:17:28 [INFO] ezdxf: creating ACAD_SCALELIST dictionary
+2026-05-08 17:17:28 [INFO] ezdxf: creating ACAD_TABLESTYLE dictionary
+2026-05-08 17:17:28 [INFO] ezdxf: creating ACAD_VISUALSTYLE dictionary
+2026-05-08 17:17:28 [WARNING] platmap.routes: [b6e8613d-d9e0-4d0b-96fd-311b31e6cddb] DXF generation failed: No boundary segments found for Lot 31
+2026-05-08 17:17:28 [INFO] platmap.db: Extraction saved: f4f469cc-e0a9-4eed-bf2e-8d6000b9c8af
+2026-05-08 17:17:28 [INFO] platmap.routes: [b6e8613d-d9e0-4d0b-96fd-311b31e6cddb] Done. Confidence: low
+2026-05-08 17:53:13 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-08 17:53:13 [INFO] platmap.db: Database tables ready
+2026-05-08 17:53:13 [INFO] platmap.main: Database connected
+2026-05-08 17:53:23 [INFO] platmap.main: Extractor initialized
+2026-05-08 17:53:23 [INFO] platmap.main: System ready
+2026-05-08 17:53:34 [INFO] platmap.main: [953b5985] GET /docs
+2026-05-08 17:53:34 [INFO] platmap.main: [4be4d829] GET /openapi.json
+2026-05-08 17:53:35 [INFO] platmap.main: [58cd2315] GET /docs
+2026-05-08 17:53:35 [INFO] platmap.main: [fe216be1] GET /openapi.json
+2026-05-08 17:53:35 [INFO] platmap.main: [c9a195e6] GET /docs
+2026-05-08 17:53:35 [INFO] platmap.main: [b4b5e994] GET /openapi.json
+2026-05-08 17:53:35 [INFO] platmap.main: [b5f499a0] GET /docs
+2026-05-08 17:53:35 [INFO] platmap.main: [640391b5] GET /openapi.json
+2026-05-08 17:53:35 [INFO] platmap.main: [a8a79a74] GET /docs
+2026-05-08 17:53:35 [INFO] platmap.main: [2e984fc2] GET /openapi.json
+2026-05-08 17:53:35 [INFO] platmap.main: [e5a2ca89] GET /docs
+2026-05-08 17:53:35 [INFO] platmap.main: [b058c3ab] GET /openapi.json
+2026-05-08 17:53:35 [INFO] platmap.main: [63414ffa] GET /docs
+2026-05-08 17:53:36 [INFO] platmap.main: [7a185236] GET /openapi.json
+2026-05-08 17:53:36 [INFO] platmap.main: [95a3910e] GET /docs
+2026-05-08 17:53:36 [INFO] platmap.main: [41992d7a] GET /openapi.json
+2026-05-08 17:53:36 [INFO] platmap.main: [81d7f290] GET /docs
+2026-05-08 17:53:36 [INFO] platmap.main: [42ff7519] GET /openapi.json
+2026-05-08 17:53:51 [INFO] platmap.main: [d40a0673] POST /api/v1/extract
+2026-05-08 17:53:51 [INFO] platmap.routes: [d40a0673] Job 87b9e230-2867-4660-9993-cceadd8fce14 created for Lot 31 Book 82 Page 122
+2026-05-08 17:53:51 [INFO] platmap.routes: [87b9e230-2867-4660-9993-cceadd8fce14] Extraction started for Lot 31 Book 82 Page 122
+2026-05-08 17:54:03 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 17:54:04 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 17:56:56 [INFO] platmap.routes: [87b9e230-2867-4660-9993-cceadd8fce14] JSON saved: outputs\json\4c44c35a-2255-4804-bac0-e423f31d888c.json
+2026-05-08 17:56:56 [INFO] platmap.dxf: Generating DXF for Lot 31
+2026-05-08 17:56:56 [INFO] ezdxf: creating ACAD_COLOR dictionary
+2026-05-08 17:56:56 [INFO] ezdxf: creating ACAD_GROUP dictionary
+2026-05-08 17:56:56 [INFO] ezdxf: creating ACAD_LAYOUT dictionary
+2026-05-08 17:56:56 [INFO] ezdxf: creating ACAD_MATERIAL dictionary
+2026-05-08 17:56:56 [INFO] ezdxf: creating ACAD_MLEADERSTYLE dictionary
+2026-05-08 17:56:56 [INFO] ezdxf: creating ACAD_MLINESTYLE dictionary
+2026-05-08 17:56:56 [INFO] ezdxf: creating ACAD_PLOTSETTINGS dictionary
+2026-05-08 17:56:56 [INFO] ezdxf: creating ACAD_PLOTSTYLENAME dictionary
+2026-05-08 17:56:56 [INFO] ezdxf: creating ACAD_SCALELIST dictionary
+2026-05-08 17:56:56 [INFO] ezdxf: creating ACAD_TABLESTYLE dictionary
+2026-05-08 17:56:56 [INFO] ezdxf: creating ACAD_VISUALSTYLE dictionary
+2026-05-08 17:56:56 [WARNING] platmap.routes: [87b9e230-2867-4660-9993-cceadd8fce14] DXF generation failed: No boundary segments found for Lot 31
+2026-05-08 17:56:56 [INFO] platmap.db: Extraction saved: 4c44c35a-2255-4804-bac0-e423f31d888c
+2026-05-08 17:56:56 [INFO] platmap.routes: [87b9e230-2867-4660-9993-cceadd8fce14] Done. Confidence: low
+2026-05-08 18:05:05 [INFO] platmap.main: [ad253f83] GET /api/v1/corrections/template/4c44c35a-2255-4804-bac0-e423f31d888c
+2026-05-08 18:11:31 [INFO] platmap.main: Shutting down...
+2026-05-08 18:11:31 [INFO] platmap.main: Shutdown complete
+2026-05-08 18:11:40 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-08 18:11:40 [INFO] platmap.db: Database tables ready
+2026-05-08 18:11:40 [INFO] platmap.main: Database connected
+2026-05-08 18:11:47 [INFO] platmap.main: Extractor initialized
+2026-05-08 18:11:47 [INFO] platmap.main: System ready
+2026-05-08 18:11:55 [INFO] platmap.main: [87166b8a] GET /docs
+2026-05-08 18:11:55 [INFO] platmap.main: [9e853cf5] GET /openapi.json
+2026-05-08 18:11:55 [INFO] platmap.main: [7c4b878f] GET /docs
+2026-05-08 18:11:55 [INFO] platmap.main: [83b7df8b] GET /openapi.json
+2026-05-08 18:11:55 [INFO] platmap.main: [a20c39a1] GET /docs
+2026-05-08 18:11:56 [INFO] platmap.main: [541d9775] GET /openapi.json
+2026-05-08 18:11:56 [INFO] platmap.main: [908b57db] GET /docs
+2026-05-08 18:11:56 [INFO] platmap.main: [58b08bc6] GET /openapi.json
+2026-05-08 18:11:56 [INFO] platmap.main: [17851e8a] GET /docs
+2026-05-08 18:11:56 [INFO] platmap.main: [581fcc64] GET /openapi.json
+2026-05-08 18:11:56 [INFO] platmap.main: [473473fb] GET /docs
+2026-05-08 18:11:56 [INFO] platmap.main: [dbbb4486] GET /openapi.json
+2026-05-08 18:12:33 [INFO] platmap.main: [8c8e1979] POST /api/v1/extract
+2026-05-08 18:12:33 [INFO] platmap.routes: [8c8e1979] Job 7aac81be-49ba-4979-b6db-ebe41253633f created for Lot 31 Book 82 Page 122
+2026-05-08 18:12:33 [INFO] platmap.routes: [7aac81be-49ba-4979-b6db-ebe41253633f] Extraction started for Lot 31 Book 82 Page 122
+2026-05-08 18:12:33 [WARNING] platmap.routes: Attempt 1 failed: PlatMapExtractor.extract() got an unexpected keyword argument 'extraction_id'. Retrying in 2s...
+2026-05-08 18:12:35 [WARNING] platmap.routes: Attempt 2 failed: PlatMapExtractor.extract() got an unexpected keyword argument 'extraction_id'. Retrying in 4s...
+2026-05-08 18:12:39 [ERROR] platmap.routes: All 3 attempts failed
+2026-05-08 18:12:39 [ERROR] platmap.routes: [7aac81be-49ba-4979-b6db-ebe41253633f] Extraction failed: PlatMapExtractor.extract() got an unexpected keyword argument 'extraction_id'
+Traceback (most recent call last):
+  File "C:\Users\11119\Desktop\Platmap_Extraction_System\api\routes.py", line 203, in _run_extraction
+    result = _extract_with_retry(
+  File "C:\Users\11119\Desktop\Platmap_Extraction_System\api\routes.py", line 289, in _extract_with_retry
+    raise last_error
+  File "C:\Users\11119\Desktop\Platmap_Extraction_System\api\routes.py", line 270, in _extract_with_retry
+    return extractor.extract(
+TypeError: PlatMapExtractor.extract() got an unexpected keyword argument 'extraction_id'
+2026-05-08 18:17:18 [INFO] platmap.main: Shutting down...
+2026-05-08 18:17:18 [INFO] platmap.main: Shutdown complete
+2026-05-08 18:17:22 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-08 18:17:22 [INFO] platmap.db: Database tables ready
+2026-05-08 18:17:22 [INFO] platmap.main: Database connected
+2026-05-08 18:17:28 [INFO] platmap.main: Extractor initialized
+2026-05-08 18:17:28 [INFO] platmap.main: System ready
+2026-05-08 18:17:40 [INFO] platmap.main: [929d241c] GET /docs
+2026-05-08 18:17:40 [INFO] platmap.main: [c2ef0e32] GET /openapi.json
+2026-05-08 18:17:40 [INFO] platmap.main: [85e8a616] GET /docs
+2026-05-08 18:17:40 [INFO] platmap.main: [b548cbd4] GET /openapi.json
+2026-05-08 18:17:40 [INFO] platmap.main: [113600ed] GET /docs
+2026-05-08 18:17:40 [INFO] platmap.main: [e80447b1] GET /openapi.json
+2026-05-08 18:17:40 [INFO] platmap.main: [60be7a99] GET /docs
+2026-05-08 18:17:40 [INFO] platmap.main: [15964b9b] GET /openapi.json
+2026-05-08 18:17:40 [INFO] platmap.main: [2967b6f3] GET /docs
+2026-05-08 18:17:41 [INFO] platmap.main: [1012b644] GET /openapi.json
+2026-05-08 18:17:59 [INFO] platmap.main: [02747556] POST /api/v1/extract
+2026-05-08 18:17:59 [INFO] platmap.routes: [02747556] Job 65107133-4a81-49aa-9493-1fd6384e47f3 created for Lot 31 Book 82 Page 122
+2026-05-08 18:17:59 [INFO] platmap.routes: [65107133-4a81-49aa-9493-1fd6384e47f3] Extraction started for Lot 31 Book 82 Page 122
+2026-05-08 18:18:11 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 18:18:12 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 18:18:12 [INFO] httpx: HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+2026-05-08 18:21:14 [INFO] platmap.routes: [65107133-4a81-49aa-9493-1fd6384e47f3] JSON saved: outputs\json\d07a5e3c-1eb4-47bb-bc43-bd11b0a16e61.json
+2026-05-08 18:21:14 [INFO] platmap.dxf: Generating DXF for Lot 31
+2026-05-08 18:21:14 [INFO] ezdxf: creating ACAD_COLOR dictionary
+2026-05-08 18:21:14 [INFO] ezdxf: creating ACAD_GROUP dictionary
+2026-05-08 18:21:14 [INFO] ezdxf: creating ACAD_LAYOUT dictionary
+2026-05-08 18:21:14 [INFO] ezdxf: creating ACAD_MATERIAL dictionary
+2026-05-08 18:21:14 [INFO] ezdxf: creating ACAD_MLEADERSTYLE dictionary
+2026-05-08 18:21:14 [INFO] ezdxf: creating ACAD_MLINESTYLE dictionary
+2026-05-08 18:21:14 [INFO] ezdxf: creating ACAD_PLOTSETTINGS dictionary
+2026-05-08 18:21:14 [INFO] ezdxf: creating ACAD_PLOTSTYLENAME dictionary
+2026-05-08 18:21:14 [INFO] ezdxf: creating ACAD_SCALELIST dictionary
+2026-05-08 18:21:14 [INFO] ezdxf: creating ACAD_TABLESTYLE dictionary
+2026-05-08 18:21:14 [INFO] ezdxf: creating ACAD_VISUALSTYLE dictionary
+2026-05-08 18:21:14 [WARNING] platmap.routes: [65107133-4a81-49aa-9493-1fd6384e47f3] DXF generation failed: No boundary segments found for Lot 31
+2026-05-08 18:21:14 [INFO] platmap.db: Extraction saved: d07a5e3c-1eb4-47bb-bc43-bd11b0a16e61
+2026-05-08 18:21:14 [INFO] platmap.routes: [65107133-4a81-49aa-9493-1fd6384e47f3] Done. Confidence: low
+2026-05-08 18:21:14 [INFO] platmap.main: Shutting down...
+2026-05-08 18:21:14 [INFO] platmap.main: Shutdown complete
+2026-05-08 18:25:32 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-08 18:25:32 [INFO] platmap.db: Database tables ready
+2026-05-08 18:25:32 [INFO] platmap.main: Database connected
+2026-05-08 18:25:39 [INFO] platmap.main: Extractor initialized
+2026-05-08 18:25:39 [INFO] platmap.main: System ready
+2026-05-08 18:25:48 [INFO] platmap.main: [838991d7] GET /docs
+2026-05-08 18:25:48 [INFO] platmap.main: [efd33b95] GET /openapi.json
+2026-05-08 18:25:49 [INFO] platmap.main: [d2667ab5] GET /docs
+2026-05-08 18:25:49 [INFO] platmap.main: [565241c0] GET /openapi.json
+2026-05-08 18:25:49 [INFO] platmap.main: [469bd13a] GET /docs
+2026-05-08 18:25:49 [INFO] platmap.main: [0152d7d1] GET /openapi.json
+2026-05-08 18:25:49 [INFO] platmap.main: [0038e8fe] GET /docs
+2026-05-08 18:25:49 [INFO] platmap.main: [43b7c747] GET /openapi.json
+2026-05-08 18:26:09 [INFO] platmap.main: [bffc4761] POST /api/v1/extract
+2026-05-08 18:26:10 [INFO] platmap.routes: [bffc4761] Job ab1499fa-777b-4d5d-a9bd-2e026cd07933 created for Lot 31 Book 82 Page 122
+2026-05-08 18:26:10 [INFO] platmap.routes: [ab1499fa-777b-4d5d-a9bd-2e026cd07933] Extraction started for Lot 31 Book 82 Page 122
+2026-05-08 18:26:22 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 18:26:23 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 18:26:25 [INFO] httpx: HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-08 18:26:25 [INFO] platmap.routes: [ab1499fa-777b-4d5d-a9bd-2e026cd07933] JSON saved: outputs\json\dd29cf65-27f0-4eb9-8cb3-dfba1af706a1.json
+2026-05-08 18:26:25 [INFO] platmap.dxf: Generating DXF for Lot 31
+2026-05-08 18:26:25 [INFO] ezdxf: creating ACAD_COLOR dictionary
+2026-05-08 18:26:25 [INFO] ezdxf: creating ACAD_GROUP dictionary
+2026-05-08 18:26:25 [INFO] ezdxf: creating ACAD_LAYOUT dictionary
+2026-05-08 18:26:25 [INFO] ezdxf: creating ACAD_MATERIAL dictionary
+2026-05-08 18:26:25 [INFO] ezdxf: creating ACAD_MLEADERSTYLE dictionary
+2026-05-08 18:26:25 [INFO] ezdxf: creating ACAD_MLINESTYLE dictionary
+2026-05-08 18:26:25 [INFO] ezdxf: creating ACAD_PLOTSETTINGS dictionary
+2026-05-08 18:26:25 [INFO] ezdxf: creating ACAD_PLOTSTYLENAME dictionary
+2026-05-08 18:26:25 [INFO] ezdxf: creating ACAD_SCALELIST dictionary
+2026-05-08 18:26:25 [INFO] ezdxf: creating ACAD_TABLESTYLE dictionary
+2026-05-08 18:26:25 [INFO] ezdxf: creating ACAD_VISUALSTYLE dictionary
+2026-05-08 18:26:25 [INFO] platmap.dxf: Drawing 4 boundary segment(s)
+2026-05-08 18:26:25 [WARNING] platmap.dxf: Segment 2 (seg_2): missing curve data — skipped
+2026-05-08 18:26:25 [INFO] platmap.dxf: Segments: 3 drawn, 1 skipped
+2026-05-08 18:26:25 [WARNING] platmap.dxf: Closure error: 213.90ft (tolerance 1.0ft) — adding closing line
+2026-05-08 18:26:25 [INFO] ezdxf: did not write header var $INTERFEREOBJVS, value is None.
+2026-05-08 18:26:25 [INFO] ezdxf: did not write header var $INTERFEREVPVS, value is None.
+2026-05-08 18:26:25 [INFO] platmap.routes: [ab1499fa-777b-4d5d-a9bd-2e026cd07933] DXF saved: outputs\dxf\dd29cf65-27f0-4eb9-8cb3-dfba1af706a1.dxf
+2026-05-08 18:26:25 [INFO] platmap.db: Extraction saved: dd29cf65-27f0-4eb9-8cb3-dfba1af706a1
+2026-05-08 18:26:25 [INFO] platmap.routes: [ab1499fa-777b-4d5d-a9bd-2e026cd07933] Done. Confidence: high
+2026-05-08 18:27:19 [INFO] platmap.main: [8ecef474] GET /api/v1/corrections/template/dd29cf65-27f0-4eb9-8cb3-dfba1af706a1
+2026-05-08 18:32:27 [INFO] platmap.main: [0cb85a44] GET /api/v1/dxf/dd29cf65-27f0-4eb9-8cb3-dfba1af706a1
+2026-05-08 18:45:50 [INFO] platmap.main: Shutting down...
+2026-05-08 18:45:50 [INFO] platmap.main: Shutdown complete
+2026-05-08 18:46:00 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-08 18:46:00 [INFO] platmap.db: Database tables ready
+2026-05-08 18:46:00 [INFO] platmap.main: Database connected
+2026-05-08 18:46:06 [INFO] platmap.main: Extractor initialized
+2026-05-08 18:46:06 [INFO] platmap.main: System ready
+2026-05-08 18:46:15 [INFO] platmap.main: [99f3db70] GET /docs
+2026-05-08 18:46:15 [INFO] platmap.main: [17f90e6d] GET /openapi.json
+2026-05-08 18:46:15 [INFO] platmap.main: [355be803] GET /docs
+2026-05-08 18:46:15 [INFO] platmap.main: [6bfaff8e] GET /openapi.json
+2026-05-08 18:46:15 [INFO] platmap.main: [930f2592] GET /docs
+2026-05-08 18:46:15 [INFO] platmap.main: [d818f45b] GET /openapi.json
+2026-05-08 18:46:15 [INFO] platmap.main: [3a707aad] GET /docs
+2026-05-08 18:46:16 [INFO] platmap.main: [edd358eb] GET /openapi.json
+2026-05-08 18:46:16 [INFO] platmap.main: [fe826521] GET /docs
+2026-05-08 18:46:16 [INFO] platmap.main: [db758204] GET /openapi.json
+2026-05-08 18:46:51 [INFO] platmap.main: [c82c70e3] POST /api/v1/extract
+2026-05-08 18:46:51 [INFO] platmap.routes: [c82c70e3] Job ba09edbb-4601-44cc-a3a2-dda5ddd3fc05 created for Lot 31 Book 82 Page 122
+2026-05-08 18:46:51 [INFO] platmap.routes: [ba09edbb-4601-44cc-a3a2-dda5ddd3fc05] Extraction started for Lot 31 Book 82 Page 122
+2026-05-08 18:47:03 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 18:47:03 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 18:47:06 [INFO] httpx: HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-08 18:47:06 [INFO] platmap.routes: [ba09edbb-4601-44cc-a3a2-dda5ddd3fc05] JSON saved: outputs\json\be0ca6ff-487f-4006-b210-dbf6ce95bbdd.json
+2026-05-08 18:47:06 [INFO] ezdxf: creating ACAD_COLOR dictionary
+2026-05-08 18:47:06 [INFO] ezdxf: creating ACAD_GROUP dictionary
+2026-05-08 18:47:06 [INFO] ezdxf: creating ACAD_LAYOUT dictionary
+2026-05-08 18:47:06 [INFO] ezdxf: creating ACAD_MATERIAL dictionary
+2026-05-08 18:47:06 [INFO] ezdxf: creating ACAD_MLEADERSTYLE dictionary
+2026-05-08 18:47:06 [INFO] ezdxf: creating ACAD_MLINESTYLE dictionary
+2026-05-08 18:47:06 [INFO] ezdxf: creating ACAD_PLOTSETTINGS dictionary
+2026-05-08 18:47:06 [INFO] ezdxf: creating ACAD_PLOTSTYLENAME dictionary
+2026-05-08 18:47:06 [INFO] ezdxf: creating ACAD_SCALELIST dictionary
+2026-05-08 18:47:06 [INFO] ezdxf: creating ACAD_TABLESTYLE dictionary
+2026-05-08 18:47:06 [INFO] ezdxf: creating ACAD_VISUALSTYLE dictionary
+2026-05-08 18:47:06 [INFO] ezdxf: did not write header var $INTERFEREOBJVS, value is None.
+2026-05-08 18:47:06 [INFO] ezdxf: did not write header var $INTERFEREVPVS, value is None.
+2026-05-08 18:47:06 [INFO] platmap.routes: [ba09edbb-4601-44cc-a3a2-dda5ddd3fc05] DXF saved: outputs\dxf\be0ca6ff-487f-4006-b210-dbf6ce95bbdd.dxf
+2026-05-08 18:47:06 [INFO] platmap.db: Extraction saved: be0ca6ff-487f-4006-b210-dbf6ce95bbdd
+2026-05-08 18:47:06 [INFO] platmap.routes: [ba09edbb-4601-44cc-a3a2-dda5ddd3fc05] Done. Confidence: high
+2026-05-08 18:47:48 [INFO] platmap.main: [16fbbaaf] GET /api/v1/dxf/be0ca6ff-487f-4006-b210-dbf6ce95bbdd
+2026-05-08 18:50:40 [INFO] platmap.main: [2bc68834] POST /api/v1/extract
+2026-05-08 18:50:40 [INFO] platmap.routes: [2bc68834] Job 41aa415c-8f72-4ee1-8da1-5419c09dadaf created for Lot 33 Book 82 Page 122
+2026-05-08 18:50:40 [INFO] platmap.routes: [41aa415c-8f72-4ee1-8da1-5419c09dadaf] Extraction started for Lot 33 Book 82 Page 122
+2026-05-08 18:50:53 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 18:50:55 [INFO] httpx: HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-08 18:50:55 [INFO] platmap.routes: [41aa415c-8f72-4ee1-8da1-5419c09dadaf] JSON saved: outputs\json\306bc7cf-2f32-4ee5-857a-83e5402bde3d.json
+2026-05-08 18:50:55 [INFO] ezdxf: creating ACAD_COLOR dictionary
+2026-05-08 18:50:55 [INFO] ezdxf: creating ACAD_GROUP dictionary
+2026-05-08 18:50:55 [INFO] ezdxf: creating ACAD_LAYOUT dictionary
+2026-05-08 18:50:55 [INFO] ezdxf: creating ACAD_MATERIAL dictionary
+2026-05-08 18:50:55 [INFO] ezdxf: creating ACAD_MLEADERSTYLE dictionary
+2026-05-08 18:50:55 [INFO] ezdxf: creating ACAD_MLINESTYLE dictionary
+2026-05-08 18:50:55 [INFO] ezdxf: creating ACAD_PLOTSETTINGS dictionary
+2026-05-08 18:50:55 [INFO] ezdxf: creating ACAD_PLOTSTYLENAME dictionary
+2026-05-08 18:50:55 [INFO] ezdxf: creating ACAD_SCALELIST dictionary
+2026-05-08 18:50:55 [INFO] ezdxf: creating ACAD_TABLESTYLE dictionary
+2026-05-08 18:50:55 [INFO] ezdxf: creating ACAD_VISUALSTYLE dictionary
+2026-05-08 18:50:55 [INFO] ezdxf: did not write header var $INTERFEREOBJVS, value is None.
+2026-05-08 18:50:55 [INFO] ezdxf: did not write header var $INTERFEREVPVS, value is None.
+2026-05-08 18:50:55 [INFO] platmap.routes: [41aa415c-8f72-4ee1-8da1-5419c09dadaf] DXF saved: outputs\dxf\306bc7cf-2f32-4ee5-857a-83e5402bde3d.dxf
+2026-05-08 18:50:55 [INFO] platmap.db: Extraction saved: 306bc7cf-2f32-4ee5-857a-83e5402bde3d
+2026-05-08 18:50:55 [INFO] platmap.routes: [41aa415c-8f72-4ee1-8da1-5419c09dadaf] Done. Confidence: high
+2026-05-08 18:51:37 [INFO] platmap.main: [5bd64391] GET /api/v1/corrections/template/306bc7cf-2f32-4ee5-857a-83e5402bde3d
+2026-05-08 18:53:50 [INFO] platmap.main: [d0bcda15] GET /api/v1/dxf/306bc7cf-2f32-4ee5-857a-83e5402bde3d
+2026-05-08 19:12:09 [INFO] platmap.main: Shutting down...
+2026-05-08 19:12:09 [INFO] platmap.main: Shutdown complete
+2026-05-08 19:12:14 [INFO] platmap.main: Starting Platmap Extraction System...
+2026-05-08 19:12:14 [INFO] platmap.db: Database tables ready
+2026-05-08 19:12:14 [INFO] platmap.main: Database connected
+2026-05-08 19:12:20 [INFO] platmap.main: Extractor initialized
+2026-05-08 19:12:20 [INFO] platmap.main: System ready
+2026-05-08 19:12:26 [INFO] platmap.main: [97f767be] GET /docs
+2026-05-08 19:12:26 [INFO] platmap.main: [e010e1d4] GET /openapi.json
+2026-05-08 19:12:26 [INFO] platmap.main: [bf9d3165] GET /docs
+2026-05-08 19:12:26 [INFO] platmap.main: [a2080cff] GET /openapi.json
+2026-05-08 19:12:26 [INFO] platmap.main: [fef022e8] GET /docs
+2026-05-08 19:12:26 [INFO] platmap.main: [5c7ff406] GET /openapi.json
+2026-05-08 19:12:26 [INFO] platmap.main: [c4d6fdcd] GET /docs
+2026-05-08 19:12:27 [INFO] platmap.main: [c42cadc0] GET /openapi.json
+2026-05-08 19:12:27 [INFO] platmap.main: [3cdf6605] GET /docs
+2026-05-08 19:12:27 [INFO] platmap.main: [ae1e11d7] GET /openapi.json
+2026-05-08 19:13:14 [INFO] platmap.main: [2421842d] POST /api/v1/extract
+2026-05-08 19:13:14 [INFO] platmap.routes: [2421842d] Job cfad0c08-90eb-4ed0-9dd6-0bc4a246b608 created for Lot 33 Book 82 Page 122
+2026-05-08 19:13:14 [INFO] platmap.routes: [cfad0c08-90eb-4ed0-9dd6-0bc4a246b608] Extraction started for Lot 33 Book 82 Page 122
+2026-05-08 19:13:26 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 19:13:26 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 401 Unauthorized"
+2026-05-08 19:13:32 [INFO] httpx: HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-08 19:13:32 [INFO] platmap.routes: [cfad0c08-90eb-4ed0-9dd6-0bc4a246b608] JSON saved: outputs\json\4d95d5de-fa64-49fe-b1f7-c92ea838612b.json
+2026-05-08 19:13:32 [INFO] ezdxf: creating ACAD_COLOR dictionary
+2026-05-08 19:13:32 [INFO] ezdxf: creating ACAD_GROUP dictionary
+2026-05-08 19:13:32 [INFO] ezdxf: creating ACAD_LAYOUT dictionary
+2026-05-08 19:13:32 [INFO] ezdxf: creating ACAD_MATERIAL dictionary
+2026-05-08 19:13:32 [INFO] ezdxf: creating ACAD_MLEADERSTYLE dictionary
+2026-05-08 19:13:32 [INFO] ezdxf: creating ACAD_MLINESTYLE dictionary
+2026-05-08 19:13:32 [INFO] ezdxf: creating ACAD_PLOTSETTINGS dictionary
+2026-05-08 19:13:32 [INFO] ezdxf: creating ACAD_PLOTSTYLENAME dictionary
+2026-05-08 19:13:32 [INFO] ezdxf: creating ACAD_SCALELIST dictionary
+2026-05-08 19:13:32 [INFO] ezdxf: creating ACAD_TABLESTYLE dictionary
+2026-05-08 19:13:32 [INFO] ezdxf: creating ACAD_VISUALSTYLE dictionary
+2026-05-08 19:13:32 [INFO] ezdxf: did not write header var $INTERFEREOBJVS, value is None.
+2026-05-08 19:13:32 [INFO] ezdxf: did not write header var $INTERFEREVPVS, value is None.
+2026-05-08 19:13:32 [INFO] platmap.routes: [cfad0c08-90eb-4ed0-9dd6-0bc4a246b608] DXF saved: outputs\dxf\4d95d5de-fa64-49fe-b1f7-c92ea838612b.dxf
+2026-05-08 19:13:32 [INFO] platmap.db: Extraction saved: 4d95d5de-fa64-49fe-b1f7-c92ea838612b
+2026-05-08 19:13:32 [INFO] platmap.routes: [cfad0c08-90eb-4ed0-9dd6-0bc4a246b608] Done. Confidence: high
+2026-05-08 19:14:31 [INFO] platmap.main: [bcd88787] GET /api/v1/dxf/4d95d5de-fa64-49fe-b1f7-c92ea838612b
+2026-05-08 19:15:56 [INFO] platmap.main: Shutting down...
+2026-05-08 19:15:56 [INFO] platmap.main: Shutdown complete

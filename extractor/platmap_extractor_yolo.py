@@ -35,6 +35,39 @@ import pytesseract
 from dotenv import load_dotenv
 load_dotenv()
 
+# ── InternVL fallback extractor (used when Claude API fails) ──
+# Tries relative import first (when used as package), then absolute,
+# so this works whether the file is imported via `extractor.platmap_extractor_yolo`
+# or run directly. If neither works, fallback is silently disabled.
+InternVLExtractor = None
+try:
+    from .extractor_internvl import InternVLExtractor  # type: ignore
+except (ImportError, ValueError):
+    try:
+        from extractor_internvl import InternVLExtractor  # type: ignore
+    except ImportError:
+        try:
+            # When the file lives inside the `extractor` package but is run
+            # as a top-level script in the same folder.
+            from extractor.extractor_internvl import InternVLExtractor  # type: ignore
+        except ImportError:
+            print("[Extractor] ⚠️  extractor_internvl.py not found — "
+                  "InternVL fallback will be unavailable")
+
+# ── Groq (Llama 4 Scout) extractor — primary fallback when Claude fails ──
+GroqExtractor = None
+try:
+    from .extractor_groq import GroqExtractor  # type: ignore
+except (ImportError, ValueError):
+    try:
+        from extractor_groq import GroqExtractor  # type: ignore
+    except ImportError:
+        try:
+            from extractor.extractor_groq import GroqExtractor  # type: ignore
+        except ImportError:
+            print("[Extractor] ⚠️  extractor_groq.py not found — "
+                  "Groq fallback will be unavailable")
+
 
 # ─────────────────────────────────────────────
 # CONFIG
@@ -562,7 +595,12 @@ class LotFinder:
         """
         Sends tiny 600px crop to Claude to confirm lot number.
         ~$0.001 per call — max_tokens=80.
+        Returns None if Claude is unavailable (caller falls back to OCR bbox).
         """
+        if self.claude is None:
+            # Claude unavailable — skip confirmation, caller uses OCR bbox
+            return None
+
         ow, oh = original_image.size
         x0, y0, x1, y1 = region
         crop = original_image.crop((x0, y0, x1, y1))
@@ -788,24 +826,72 @@ class PlatMapExtractor:
 
     def __init__(self, claude_api_key: str = None):
         key = claude_api_key or os.getenv("ANTHROPIC_API_KEY")
-        if not key:
-            raise ValueError("ANTHROPIC_API_KEY not found")
 
-        self.claude = anthropic.Anthropic(api_key=key)
+        # Claude is preferred but not strictly required — if the key is
+        # missing or invalid at runtime we transparently fall back to
+        # InternVL via Ollama. We still construct a client when a key is
+        # present so micro-confirm + main extraction can attempt Claude.
+        if key:
+            self.claude = anthropic.Anthropic(api_key=key)
+            self.claude_available = True
+        else:
+            print("[Extractor] ⚠️  ANTHROPIC_API_KEY not set — "
+                  "Claude calls will fall back to InternVL")
+            self.claude = None
+            self.claude_available = False
 
         # Load YOLO model once for both page finding and layout detection
         self.yolo_model = "yoloModel/best.pt"
         self._load_yolo_model()
 
         self.yolo_detector = YOLODetector(YOLO_MODEL_PATH)  # layout detection
+        # LotFinder works without Claude (OCR-only); _claude_confirm safely
+        # short-circuits to None when self.claude is None.
         self.lot_finder = LotFinder(self.claude)
         self.page_finder = PageFinder(self.yolo_model) if self.yolo_model else None
 
+        # ── Initialize Groq extractor (PRIMARY fallback — free, hosted) ──
+        # Llama 4 Scout 17B via Groq. Open-source model, hosted free.
+        # Tried before InternVL because cloud quality >> local 7B quality.
+        self.groq_extractor = None
+        if GroqExtractor is not None:
+            try:
+                self.groq_extractor = GroqExtractor()
+            except Exception as e:
+                print(f"[Extractor] Groq init failed: {e}")
+                self.groq_extractor = None
+
+        # ── Initialize InternVL fallback extractor (LAST RESORT — local) ──
+        # Used only if Claude AND Groq both fail (e.g. offline).
+        self.internvl_extractor = None
+        if InternVLExtractor is not None:
+            try:
+                self.internvl_extractor = InternVLExtractor()
+            except Exception as e:
+                print(f"[Extractor] InternVL init failed: {e}")
+                self.internvl_extractor = None
+
+        # Need at least one working extractor
+        groq_ok     = (self.groq_extractor
+                       and getattr(self.groq_extractor, "available", False))
+        internvl_ok = (self.internvl_extractor
+                       and getattr(self.internvl_extractor, "available", False))
+        if not self.claude_available and not groq_ok and not internvl_ok:
+            raise ValueError(
+                "No working extractor available. Set one of: "
+                "ANTHROPIC_API_KEY, GROQ_API_KEY, or run Ollama with InternVL."
+            )
+
+        groq_status     = "✅" if groq_ok     else "⚠️ unavailable"
+        internvl_status = "✅" if internvl_ok else "⚠️ unavailable"
+
         print(f"[Extractor] Initialized:")
-        print(f"  Page detection  : YOLO + OCR ({'✅' if self.page_finder else '⚠️ fallback'})")
-        print(f"  Layout detection: YOLO ({'✅' if self.yolo_detector.available else '⚠️ fallback'})")
-        print(f"  Lot detection   : OCR + Claude micro-confirm (~$0.001)")
-        print(f"  Extraction      : Claude {CLAUDE_MODEL} (~$0.015)")
+        print(f"  Page detection   : YOLO + OCR ({'✅' if self.page_finder else '⚠️ fallback'})")
+        print(f"  Layout detection : YOLO ({'✅' if self.yolo_detector.available else '⚠️ fallback'})")
+        print(f"  Lot detection    : OCR + Claude micro-confirm")
+        print(f"  Primary extract  : Claude {CLAUDE_MODEL}")
+        print(f"  Fallback 1       : Groq Llama 4 Scout ({groq_status})")
+        print(f"  Fallback 2       : InternVL local Ollama ({internvl_status})")
 
     def _load_yolo_model(self):
         """Load YOLO model for page finding (same as layout model)."""
@@ -862,7 +948,8 @@ class PlatMapExtractor:
                 page_number: Optional[int] = None,
                 plat_book: Optional[str] = None,
                 plat_page: Optional[str] = None,
-                visualize_path: Optional[str] = None) -> Dict:
+                visualize_path: Optional[str] = None,
+                extraction_id: Optional[str] = None) -> Dict:
         """
         Full extraction pipeline.
 
@@ -938,27 +1025,149 @@ class PlatMapExtractor:
         print(f"\n[Step 5] Cropping from original full-resolution image...")
         crops = self._create_crops(full_image, detected_regions, lot_number)
 
+        # Save the detected lot crop so the frontend can show the user
+        # WHAT was detected before they accept/correct the JSON. The
+        # /api/v1/lot-snapshot/{extraction_id} endpoint reads from here.
+        snapshot_filename = None
+        if "lot" in crops:
+            try:
+                snap_dir = Path(os.getenv(
+                    "LOT_SNAPSHOT_DIR", "outputs/lot_snapshots"
+                ))
+                snap_dir.mkdir(parents=True, exist_ok=True)
+                snap_id   = extraction_id or f"lot_{lot_number}_{int(time.time())}"
+                snap_path = snap_dir / f"{snap_id}.jpg"
+                crops["lot"].convert("RGB").save(
+                    str(snap_path), "JPEG", quality=88
+                )
+                snapshot_filename = snap_path.name
+                print(f"[Snapshot] Lot snapshot saved: {snap_path}")
+            except Exception as e:
+                print(f"[Snapshot] Save failed: {e}")
+
         # Visualize if requested
         if visualize_path:
             self.visualize_detections(full_image, detected_regions,
                                       visualize_path)
 
-        # ── Step 6: Claude extracts all data ──
-        print(f"\n[Step 6] Claude extraction...")
-        result = extract_with_claude(
-            self.claude, crops, lot_number, block_number
+        # ── Step 6: Extract all data (Claude → Groq → InternVL fallback) ──
+        result = self._run_extraction_with_fallback(
+            crops, lot_number, block_number
         )
 
         result["source_file"]        = str(pdf_path)
         result["page_number"]        = page_number
         result["crops_generated"]    = list(crops.keys())
         result["yolo_detections"]    = len(yolo_detections)
+        result["lot_snapshot"]       = snapshot_filename
         result["extraction_timestamp"] = datetime.utcnow().isoformat()
 
         print(f"\n{'='*60}")
         print(f"EXTRACTION COMPLETE — Lot {lot_number}")
         print(f"{'='*60}\n")
         return result
+
+    def _run_extraction_with_fallback(
+        self,
+        crops: Dict[str, Image.Image],
+        lot_number: str,
+        block_number: Optional[str],
+    ) -> Dict:
+        """
+        Try Claude first. On any Claude failure (auth, rate limit, network,
+        API error, parse failure) automatically fall back to the local
+        InternVL/Ollama extractor so the pipeline keeps working without a
+        valid Anthropic API key.
+        """
+        # ── Primary: Claude ──
+        if self.claude_available and self.claude is not None:
+            print(f"\n[Step 6] Claude extraction...")
+            try:
+                result = extract_with_claude(
+                    self.claude, crops, lot_number, block_number
+                )
+                result["extractor_used"] = "claude"
+                return result
+            except anthropic.AuthenticationError as e:
+                print(f"[Step 6] ❌ Claude authentication failed "
+                      f"(invalid API key / no credits): {e}")
+                # Disable further Claude attempts in this session
+                self.claude_available = False
+            except anthropic.RateLimitError as e:
+                print(f"[Step 6] ❌ Claude rate limited: {e}")
+            except anthropic.APIConnectionError as e:
+                print(f"[Step 6] ❌ Claude connection error: {e}")
+            except anthropic.APIStatusError as e:
+                print(f"[Step 6] ❌ Claude API status error: {e}")
+            except anthropic.APIError as e:
+                print(f"[Step 6] ❌ Claude API error: {e}")
+            except (ValueError, json.JSONDecodeError) as e:
+                # extract_with_claude raises ValueError on parse failure
+                print(f"[Step 6] ❌ Claude response parse failed: {e}")
+            except Exception as e:
+                # Catch-all so we never fail the request when a fallback exists
+                print(f"[Step 6] ❌ Unexpected Claude error: "
+                      f"{type(e).__name__}: {e}")
+
+        # ── Fallback 1: Groq (Llama 4 Scout) — free, hosted, multimodal ──
+        if (
+            self.groq_extractor is not None
+            and getattr(self.groq_extractor, "available", False)
+        ):
+            print(f"\n[Step 6] ⚠️  Falling back to Groq Llama 4 Scout...")
+            try:
+                result = self.groq_extractor.extract(
+                    crops        = crops,
+                    lot_number   = lot_number,
+                    block_number = block_number,
+                )
+                result["extractor_used"]  = "groq"
+                result["fallback_reason"] = (
+                    "claude_unavailable" if not self.claude_available
+                    else "claude_request_failed"
+                )
+                return result
+            except Exception as e:
+                print(f"[Step 6] ❌ Groq fallback failed: "
+                      f"{type(e).__name__}: {e}")
+
+        # ── Fallback 2: InternVL via Ollama (local, last resort) ──
+        if (
+            self.internvl_extractor is not None
+            and getattr(self.internvl_extractor, "available", False)
+        ):
+            print(f"\n[Step 6] ⚠️  Falling back to InternVL (local) extraction...")
+            try:
+                result = self.internvl_extractor.extract(
+                    crops=crops,
+                    lot_number=lot_number,
+                    block_number=block_number,
+                )
+                result["extractor_used"] = "internvl"
+                result["fallback_reason"] = (
+                    "claude_and_groq_unavailable"
+                    if not self.claude_available
+                    else "claude_and_groq_failed"
+                )
+                return result
+            except Exception as e:
+                print(f"[Step 6] ❌ InternVL fallback failed: "
+                      f"{type(e).__name__}: {e}")
+
+        # ── Both extractors failed — return a structured error ──
+        print(f"[Step 6] ❌ All extraction methods failed")
+        return {
+            "lot_number": lot_number,
+            "block_number": block_number or "",
+            "boundaries": [],
+            "total_segments": 0,
+            "extraction_confidence": "low",
+            "needs_review": ["entire_extraction"],
+            "error": "Both Claude and InternVL extraction failed. "
+                     "Check ANTHROPIC_API_KEY or that Ollama is running with "
+                     "the InternVL model pulled.",
+            "extractor_used": "none",
+        }
 
     def _create_crops(self, img: Image.Image,
                        detected_regions: Dict,

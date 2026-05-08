@@ -1,0 +1,42 @@
+{
+  "lot_number": "31",
+  "block_number": "0",
+  "boundaries": [
+    {
+      "segment_number": 1,
+      "type": "line",
+      "bearing": "N36\u00b053'42\"E",
+      "distance": 120.5
+    },
+    {
+      "segment_number": 2,
+      "type": "curve",
+      "curve_number": "C-2",
+      "radius": 250.0,
+      "arc_length": 45.32,
+      "delta": "10\u00b023'15\"",
+      "chord_bearing": "N15\u00b030'00\"E",
+      "chord_distance": 45.18
+    }
+  ],
+  "total_segments": 2,
+  "extraction_confidence": "high",
+  "needs_review": [],
+  "extraction_timestamp": "2026-05-08T11:18:07.626478",
+  "model_used": "blaifa/InternVL3",
+  "inference_time_sec": 73.9,
+  "extractor_used": "internvl",
+  "fallback_reason": "claude_unavailable",
+  "source_file": "C:\\Users\\11119\\AppData\\Local\\Temp\\tmp__324vyb.pdf",
+  "page_number": 0,
+  "crops_generated": [
+    "lot",
+    "curve_table_1",
+    "curve_table_2",
+    "curve_table_3",
+    "curve_table_4"
+  ],
+  "yolo_detections": 6,
+  "lot_detector_used": "yolo_ocr",
+  "lot_snapshot": "6db3b066-0409-422e-b71e-4526edf3bfa2.jpg"
+}

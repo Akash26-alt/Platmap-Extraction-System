@@ -1,25 +1,36 @@
 """
 feedback/feedback_loop.py
 --------------------------
-Injects past human corrections into Claude prompts.
+Production-hardened feedback loop.
 
-How it works:
-  1. Before each extraction, query DB for past corrections on same lot
-  2. Format corrections as "lessons learned" context
-  3. Pass to platmap_extractor as past_corrections list
-  4. Claude sees what it got wrong before and corrects itself
-
-This is the self-improvement loop:
-  Extract → Human corrects → Save to DB → Next extraction improves
+Changes from dev version:
+  - Structured logging replaces print()
+  - Exception handling — never crashes the extraction pipeline
+  - Handles both dict-based and list-based boundary formats
+  - Limits lesson string length to avoid bloating prompts
+  - Logs correction count and lesson summaries
 """
 
+import logging
 from typing import List, Dict, Optional
+
 from database.db_handler import DBHandler
+
+logger = logging.getLogger("platmap.feedback")
+
+MAX_LESSON_LEN  = 300    # max chars per lesson string
+MAX_CORRECTIONS = 3      # max corrections injected per prompt
 
 
 class FeedbackLoop:
     """
-    Retrieves past corrections and formats them for Claude prompts.
+    Retrieves past human corrections and formats them
+    for injection into Claude prompts.
+
+    Self-improvement loop:
+      Extract → Human corrects → Save to DB
+      → Next extraction of same lot sees past mistakes
+      → Claude corrects itself automatically
     """
 
     def __init__(self, db: DBHandler):
@@ -30,63 +41,114 @@ class FeedbackLoop:
         plat_book:  str,
         plat_page:  str,
         lot_number: str,
-        limit:      int = 3,
+        limit:      int = MAX_CORRECTIONS,
     ) -> List[Dict]:
         """
-        Returns past corrections formatted for the extractor.
+        Returns past corrections formatted for Claude prompt injection.
 
-        Each dict has:
-          original:  what Claude got wrong
-          corrected: what the human fixed it to
-          lesson:    auto-generated lesson description
+        Returns [] on any error — never blocks extraction.
         """
-        corrections = self.db.get_corrections(
-            plat_book, plat_page, lot_number, limit
-        )
+        try:
+            corrections = self.db.get_corrections(
+                plat_book, plat_page, lot_number, limit
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to load corrections for "
+                f"Lot {lot_number}: {e}"
+            )
+            return []
 
         if not corrections:
             return []
 
         formatted = []
         for c in corrections:
-            orig = c.get("original", {})
-            corr = c.get("corrected", {})
-            lesson = self._derive_lesson(orig, corr)
-            formatted.append({
-                "original":  orig,
-                "corrected": corr,
-                "lesson":    lesson,
-                "notes":     c.get("notes", ""),
-            })
+            try:
+                orig   = c.get("original",  {})
+                corr   = c.get("corrected", {})
+                lesson = self._derive_lesson(orig, corr)
+                formatted.append({
+                    "original":  orig,
+                    "corrected": corr,
+                    "lesson":    lesson,
+                    "notes":     (c.get("notes") or "")[:200],
+                })
+            except Exception as e:
+                logger.warning(f"Skipping malformed correction: {e}")
+                continue
 
-        print(f"[Feedback] {len(formatted)} past correction(s) "
-              f"loaded for Lot {lot_number}")
+        logger.info(
+            f"Loaded {len(formatted)} correction(s) "
+            f"for Lot {lot_number} "
+            f"(Book {plat_book} Page {plat_page})"
+        )
         return formatted
 
     def _derive_lesson(self, original: dict, corrected: dict) -> str:
         """
-        Auto-generates a plain-English lesson from the diff
-        between original and corrected extraction.
+        Auto-generates a plain-English lesson from the diff.
+        Handles both dict boundaries and list boundaries formats.
         """
         lessons = []
 
         orig_b = original.get("boundaries", {})
         corr_b = corrected.get("boundaries", {})
 
-        for side in ["front", "rear", "left_side", "right_side"]:
-            ob = orig_b.get(side, {})
-            cb = corr_b.get(side, {})
+        # Handle dict-based boundaries {front:{}, rear:{}, ...}
+        if isinstance(orig_b, dict) and isinstance(corr_b, dict):
+            for side in ["front", "rear", "left_side", "right_side"]:
+                ob = orig_b.get(side, {})
+                cb = corr_b.get(side, {})
+                lessons.extend(self._diff_segment(side, ob, cb))
 
-            if ob.get("bearing") != cb.get("bearing") and cb.get("bearing"):
-                lessons.append(
-                    f"{side} bearing was '{ob.get('bearing')}', "
-                    f"correct is '{cb.get('bearing')}'"
+        # Handle list-based boundaries [{segment_index:1,...}, ...]
+        elif isinstance(orig_b, list) and isinstance(corr_b, list):
+            for orig_seg in orig_b:
+                idx   = orig_seg.get("segment_index") or orig_seg.get("side")
+                label = str(idx)
+                # Find matching corrected segment
+                corr_seg = next(
+                    (s for s in corr_b
+                     if s.get("segment_index") == idx
+                     or s.get("side") == idx),
+                    {}
                 )
-            if ob.get("distance_ft") != cb.get("distance_ft") \
-               and cb.get("distance_ft"):
-                lessons.append(
-                    f"{side} distance was {ob.get('distance_ft')}, "
-                    f"correct is {cb.get('distance_ft')}"
-                )
+                lessons.extend(self._diff_segment(label, orig_seg, corr_seg))
 
-        return "; ".join(lessons) if lessons else "Review all boundaries carefully"
+        result = "; ".join(lessons) if lessons else \
+            "Review all boundary bearings and distances carefully"
+
+        # Cap length to avoid bloating prompts
+        if len(result) > MAX_LESSON_LEN:
+            result = result[:MAX_LESSON_LEN - 3] + "..."
+
+        return result
+
+    def _diff_segment(
+        self,
+        label:   str,
+        orig:    dict,
+        corrected: dict,
+    ) -> List[str]:
+        """Returns list of lesson strings for one boundary segment."""
+        lessons = []
+
+        if not orig or not corrected:
+            return lessons
+
+        ob_bearing  = orig.get("bearing") or orig.get("chord_bearing")
+        cb_bearing  = corrected.get("bearing") or corrected.get("chord_bearing")
+        ob_dist     = orig.get("distance_ft") or orig.get("arc_length_ft")
+        cb_dist     = corrected.get("distance_ft") or corrected.get("arc_length_ft")
+
+        if ob_bearing != cb_bearing and cb_bearing:
+            lessons.append(
+                f"{label} bearing: '{ob_bearing}' → '{cb_bearing}'"
+            )
+        if ob_dist != cb_dist and cb_dist is not None:
+            lessons.append(
+                f"{label} distance: {ob_dist} → {cb_dist}ft"
+            )
+
+        return lessons

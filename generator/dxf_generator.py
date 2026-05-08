@@ -1,161 +1,95 @@
 """
 generator/dxf_generator.py
 ---------------------------
-Converts extracted lot JSON into a DXF file.
+Converts extracted lot JSON into a fully-annotated DXF file.
 
-Supports:
-  - Line boundaries (bearing + distance)
-  - Curve boundaries (radius, arc length, delta, chord bearing)
-  - Easement annotations as text
-  - Lot number label at centroid
-  - Layers: BOUNDARY, CURVES, EASEMENTS, LABELS
+Matches the current extraction schema (Claude / Groq / InternVL):
 
-Bearing format: N36°53'00"E
-  N/S = direction from north/south
-  Degrees, minutes, seconds
-  E/W = east or west
+{
+  "lot_number": "31",
+  "block_number": "0",
+  "boundaries": [
+    {"segment_number": 1, "type": "line",
+     "bearing": "S53°07'00\"E", "distance": 120.0, ...},
+    {"segment_number": 2, "type": "curve",
+     "curve_number": "C62", "radius": 250.0, "arc_length": 45.32,
+     "delta": "10°23'15\"", "chord_bearing": "N15°30'00\"E",
+     "chord_distance": 45.18, ...},
+    ...
+  ],
+  "easements": [{"type": "UE", "width_ft": 10.0, "side": "left"}, ...],
+  ...
+}
 
-DXF coordinate system:
-  Start point = (0, 0)
-  Each boundary segment is drawn from current point
-  using bearing + distance to compute next point
+DXF layers:
+  BOUNDARY  : lot polygon line segments
+  CURVES    : arc segments
+  LABELS    : "LOT N" centroid label
+  ANNOT     : bearing + distance per line; curve_number + R/L per curve
+  EASEMENTS : easement list alongside the polygon
 """
 
 import math
 import re
-import io
+import os
+import tempfile
+from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
 import ezdxf
 from ezdxf import units
-from ezdxf.enums import TextEntityAlignment
 
 
 # ─────────────────────────────────────────────
 # BEARING PARSER
 # ─────────────────────────────────────────────
 
+_BEARING_RE_FULL = re.compile(
+    r'([NS])\s*(\d+(?:\.\d+)?)\s*[°]\s*'
+    r'(\d+(?:\.\d+)?)\s*[\'\u2019]\s*'
+    r'(\d+(?:\.\d+)?)\s*[\"\u201D]\s*([EW])',
+    re.IGNORECASE,
+)
+_BEARING_RE_NOSEC = re.compile(
+    r'([NS])\s*(\d+(?:\.\d+)?)\s*[°]\s*'
+    r'(\d+(?:\.\d+)?)\s*[\'\u2019]\s*([EW])',
+    re.IGNORECASE,
+)
+
+
 def parse_bearing(bearing: str) -> Optional[float]:
-    """
-    Converts a surveyor bearing string to a math angle in degrees.
-
-    Surveyor bearing: N36°53'00"E
-    Math angle: measured counter-clockwise from east (standard)
-
-    Returns angle in degrees (0-360), or None if unparseable.
-    """
+    """Surveyor bearing → math angle in degrees (CCW from east). None if unparseable."""
     if not bearing:
         return None
+    s = bearing.strip().upper()
 
-    bearing = bearing.strip().upper()
-
-    # Pattern: N/S + degrees + ° + minutes + ' + seconds + " + E/W
-    pattern = r'([NS])\s*(\d+(?:\.\d+)?)°\s*(\d+(?:\.\d+)?)\'(\d+(?:\.\d+)?)"([EW])'
-    m = re.match(pattern, bearing)
-
-    if not m:
-        # Try without seconds
-        pattern2 = r'([NS])\s*(\d+(?:\.\d+)?)°\s*(\d+(?:\.\d+)?)\'([EW])'
-        m = re.match(pattern2, bearing)
-        if m:
-            ns, deg, min_, ew = m.groups()
-            sec = 0.0
-        else:
-            print(f"[DXF] Cannot parse bearing: '{bearing}'")
+    m = _BEARING_RE_FULL.search(s)
+    if m:
+        ns, deg, mn, sc, ew = m.groups()
+        sec = float(sc)
+    else:
+        m = _BEARING_RE_NOSEC.search(s)
+        if not m:
             return None
-    else:
-        ns, deg, min_, sec, ew = m.groups()
+        ns, deg, mn, ew = m.groups()
+        sec = 0.0
 
-    # Convert to decimal degrees from north
-    decimal_deg = float(deg) + float(min_)/60 + float(sec)/3600
+    decimal_deg = float(deg) + float(mn) / 60.0 + sec / 3600.0
+    if   ns == 'N' and ew == 'E': azimuth = decimal_deg
+    elif ns == 'N' and ew == 'W': azimuth = 360.0 - decimal_deg
+    elif ns == 'S' and ew == 'E': azimuth = 180.0 - decimal_deg
+    elif ns == 'S' and ew == 'W': azimuth = 180.0 + decimal_deg
+    else: return None
 
-    # Convert surveyor bearing to azimuth (degrees from north, clockwise)
-    if ns == 'N' and ew == 'E':
-        azimuth = decimal_deg
-    elif ns == 'N' and ew == 'W':
-        azimuth = 360 - decimal_deg
-    elif ns == 'S' and ew == 'E':
-        azimuth = 180 - decimal_deg
-    elif ns == 'S' and ew == 'W':
-        azimuth = 180 + decimal_deg
-    else:
-        return None
-
-    # Convert azimuth to math angle (CCW from east)
-    math_angle = 90 - azimuth
-    return math_angle
+    return (90.0 - azimuth) % 360.0
 
 
-def bearing_to_delta(bearing: str, distance: float
-                     ) -> Tuple[float, float]:
-    """
-    Computes (dx, dy) from a bearing and distance.
-    Returns (0, 0) if bearing is unparseable.
-    """
+def bearing_to_delta(bearing: str, distance: float) -> Tuple[float, float]:
     angle = parse_bearing(bearing)
-    if angle is None:
+    if angle is None or distance is None:
         return 0.0, 0.0
     rad = math.radians(angle)
     return distance * math.cos(rad), distance * math.sin(rad)
-
-
-# ─────────────────────────────────────────────
-# CURVE CALCULATOR
-# ─────────────────────────────────────────────
-
-def compute_arc_endpoints(
-    start: Tuple[float, float],
-    chord_bearing: str,
-    chord_distance: float,
-    radius: float,
-    arc_length: float,
-    delta_str: str,
-) -> Tuple[Tuple[float, float], Tuple[float, float], float]:
-    """
-    Computes arc end point and center for DXF arc entity.
-
-    Returns:
-      (end_point, center_point, start_angle_deg)
-    """
-    # End point via chord
-    dx, dy = bearing_to_delta(chord_bearing, chord_distance)
-    end = (start[0] + dx, start[1] + dy)
-
-    # Parse delta angle
-    delta_deg = 0.0
-    if delta_str:
-        m = re.search(r'(\d+(?:\.\d+)?)°', delta_str)
-        if m:
-            delta_deg = float(m.group(1))
-            m2 = re.search(r"(\d+(?:\.\d+)?)'", delta_str)
-            if m2:
-                delta_deg += float(m2.group(1)) / 60
-
-    # Center point
-    # Perpendicular to chord midpoint at distance = sagitta offset
-    mid_x = (start[0] + end[0]) / 2
-    mid_y = (start[1] + end[1]) / 2
-    half_chord = chord_distance / 2
-
-    if radius > half_chord:
-        sagitta = math.sqrt(radius**2 - half_chord**2)
-    else:
-        sagitta = 0.0
-
-    # Perpendicular direction
-    chord_angle = math.atan2(dy, dx)
-    perp_angle  = chord_angle + math.pi / 2
-
-    center = (
-        mid_x + sagitta * math.cos(perp_angle),
-        mid_y + sagitta * math.sin(perp_angle),
-    )
-
-    start_angle = math.degrees(
-        math.atan2(start[1] - center[1], start[0] - center[0])
-    )
-
-    return end, center, start_angle
 
 
 # ─────────────────────────────────────────────
@@ -163,203 +97,316 @@ def compute_arc_endpoints(
 # ─────────────────────────────────────────────
 
 class DXFGenerator:
-    """
-    Converts platmap extraction JSON to a DXF file.
+    LAYER_BOUNDARY  = "BOUNDARY"
+    LAYER_CURVES    = "CURVES"
+    LAYER_LABELS    = "LABELS"
+    LAYER_ANNOT     = "ANNOT"
+    LAYER_EASEMENTS = "EASEMENTS"
 
-    Layers created:
-      BOUNDARY   — lot boundary lines
-      CURVES     — arc segments
-      EASEMENTS  — easement text annotations
-      LABELS     — lot number label
-    """
-
-    LAYER_BOUNDARY = "BOUNDARY"
-    LAYER_CURVES   = "CURVES"
-    LAYER_EASEMENT = "EASEMENTS"
-    LAYER_LABELS   = "LABELS"
+    BASE_TEXT_HEIGHT       = 2.5
+    LOT_LABEL_HEIGHT       = 5.0
+    EASEMENT_TEXT_HEIGHT   = 2.0
+    LABEL_OFFSET_FACTOR    = 0.025
 
     def generate(self, extraction: dict,
-                 output_path: str = None) -> bytes:
-        """
-        Generates DXF from extraction JSON.
-
-        Args:
-            extraction:  The JSON dict from Claude extraction
-            output_path: Optional file path to save DXF
-
-        Returns:
-            DXF file content as bytes
-        """
+                 output_path: Optional[str] = None) -> bytes:
         doc = ezdxf.new(dxfversion="R2010")
-        doc.units = units.FEET
+        doc.units = units.FT
         msp = doc.modelspace()
-
         self._setup_layers(doc)
 
-        lot_number = extraction.get("lot_number", "?")
-        boundaries = extraction.get("boundaries", {})
-        curves_data = {
-            c["curve_id"]: c
-            for c in extraction.get("curves", [])
-            if c.get("curve_id")
-        }
-        easements = extraction.get("easements", [])
+        lot_number   = str(extraction.get("lot_number", "?"))
+        block_number = str(extraction.get("block_number", "") or "")
+        segments     = extraction.get("boundaries") or []
+        easements    = extraction.get("easements") or []
 
-        # Build ordered boundary list
-        # Order: front → right_side → rear → left_side (clockwise)
-        ordered_sides = ["front", "right_side", "rear", "left_side"]
-        # Also handle segment-based boundaries from newer extraction format
-        segments = extraction.get("boundaries_ordered") or [
-            {"side": s, **boundaries.get(s, {})}
-            for s in ordered_sides
-            if s in boundaries
-        ]
-
-        current_point = (0.0, 0.0)
-        all_points    = [current_point]
+        # Walk perimeter
+        current     = (0.0, 0.0)
+        all_points  = [current]
+        seg_records = []
 
         for seg in segments:
-            is_curve  = seg.get("is_curve", False)
-            curve_refs = seg.get("curve_refs", [])
+            stype = (seg.get("type") or "").lower().strip()
 
-            if is_curve and curve_refs:
-                # Draw arc
-                for curve_id in curve_refs:
-                    curve = curves_data.get(curve_id)
-                    if not curve:
-                        continue
-                    current_point = self._draw_curve(
-                        msp, current_point, curve
-                    )
-                    all_points.append(current_point)
+            if stype == "curve":
+                start = current
+                end   = self._draw_curve(msp, current, seg)
+                seg_records.append({"kind": "curve", "start": start,
+                                    "end": end, "seg": seg})
+                current = end
             else:
-                bearing  = seg.get("bearing", "")
-                distance = seg.get("distance_ft") or seg.get("distance", 0)
-                if not bearing or not distance:
+                bearing  = seg.get("bearing") or ""
+                distance = seg.get("distance")
+                if distance is None:
+                    distance = seg.get("distance_ft")
+                try:
+                    distance = float(distance) if distance is not None else 0.0
+                except (TypeError, ValueError):
+                    distance = 0.0
+
+                if not bearing or distance <= 0:
+                    seg_records.append({"kind": "skip", "seg": seg})
                     continue
-                next_point = self._draw_line(
-                    msp, current_point, bearing, float(distance)
-                )
-                all_points.append(next_point)
-                current_point = next_point
 
-        # Close boundary back to origin if not already closed
-        if all_points and len(all_points) > 1:
+                start = current
+                end   = self._draw_line(msp, start, bearing, distance)
+                seg_records.append({"kind": "line", "start": start,
+                                    "end": end, "seg": seg})
+                current = end
+
+            all_points.append(current)
+
+        # Close polygon back to origin if it didn't end there
+        if len(all_points) > 1:
             last = all_points[-1]
-            if abs(last[0]) > 0.01 or abs(last[1]) > 0.01:
-                msp.add_line(
-                    last, (0.0, 0.0),
-                    dxfattribs={"layer": self.LAYER_BOUNDARY}
-                )
+            if math.hypot(last[0], last[1]) > 0.5:
+                msp.add_line(last, (0.0, 0.0),
+                             dxfattribs={"layer":   self.LAYER_BOUNDARY,
+                                         "linetype": "DASHED"})
 
-        # Lot number label at centroid
-        if all_points:
-            cx = sum(p[0] for p in all_points) / len(all_points)
-            cy = sum(p[1] for p in all_points) / len(all_points)
-            msp.add_text(
-                f"LOT {lot_number}",
-                dxfattribs={
-                    "layer":  self.LAYER_LABELS,
-                    "height": 3.0,
-                    "insert": (cx, cy),
-                }
-            )
+        # Centroid + extent for label sizing
+        if len(all_points) >= 2:
+            xs = [p[0] for p in all_points]
+            ys = [p[1] for p in all_points]
+            cx, cy   = sum(xs) / len(xs), sum(ys) / len(ys)
+            lot_size = max(max(xs) - min(xs), max(ys) - min(ys))
+        else:
+            cx = cy = 0.0
+            lot_size = 100.0
 
-        # Easement annotations
-        for i, e in enumerate(easements):
-            etype = e.get("type", "Easement")
-            width = e.get("width_ft", "")
-            text  = f"{etype}" + (f" {width}ft" if width else "")
-            msp.add_text(
-                text,
-                dxfattribs={
-                    "layer":  self.LAYER_EASEMENT,
-                    "height": 1.5,
-                    "insert": (5.0, -5.0 * (i + 1)),
-                }
-            )
+        # Annotate every segment
+        self._annotate_segments(msp, seg_records, lot_size)
 
-        # Save or return bytes
+        # Lot label at centroid
+        lot_label = f"LOT {lot_number}"
+        if block_number and block_number != "0":
+            lot_label += f"  BLK {block_number}"
+        t = msp.add_text(
+            lot_label,
+            dxfattribs={
+                "layer":  self.LAYER_LABELS,
+                "height": max(self.LOT_LABEL_HEIGHT, lot_size * 0.04),
+            },
+        )
+        t.set_placement(
+            (cx, cy),
+            align=ezdxf.enums.TextEntityAlignment.MIDDLE_CENTER,
+        )
+
+        # Easements
+        self._draw_easements(msp, easements, all_points, lot_size)
+
+        # Persist (avoid streams: ezdxf.write() is text/bytes inconsistent
+        # across versions, so saveas() + read_bytes() is bulletproof).
         if output_path:
             doc.saveas(output_path)
-            print(f"[DXF] Saved: {output_path}")
+            return Path(output_path).read_bytes()
 
-        stream = io.BytesIO()
-        doc.write(stream)
-        stream.seek(0)
-        return stream.read()
+        with tempfile.NamedTemporaryFile(suffix=".dxf", delete=False) as tf:
+            tmp = tf.name
+        try:
+            doc.saveas(tmp)
+            return Path(tmp).read_bytes()
+        finally:
+            try: os.unlink(tmp)
+            except OSError: pass
+
+    # ─────────────────────────────────────────────
+    # LAYERS
+    # ─────────────────────────────────────────────
 
     def _setup_layers(self, doc):
-        """Creates DXF layers with standard colors."""
-        layers = [
-            (self.LAYER_BOUNDARY, 7),   # white
-            (self.LAYER_CURVES,   3),   # green
-            (self.LAYER_EASEMENT, 2),   # yellow
-            (self.LAYER_LABELS,   4),   # cyan
-        ]
-        for name, color in layers:
-            layer = doc.layers.new(name)
-            layer.color = color
+        for name, color in [
+            (self.LAYER_BOUNDARY,  7),
+            (self.LAYER_CURVES,    3),
+            (self.LAYER_LABELS,    4),
+            (self.LAYER_ANNOT,     1),
+            (self.LAYER_EASEMENTS, 2),
+        ]:
+            doc.layers.add(name=name, color=color)
 
-    def _draw_line(self, msp, start: Tuple[float, float],
-                   bearing: str, distance: float
-                   ) -> Tuple[float, float]:
-        """Draws a line segment. Returns end point."""
+        if "DASHED" not in doc.linetypes:
+            doc.linetypes.add(
+                "DASHED",
+                pattern="A,.5,-.25",
+                description="Dashed __ __ __",
+            )
+
+    # ─────────────────────────────────────────────
+    # SEGMENT DRAWING
+    # ─────────────────────────────────────────────
+
+    def _draw_line(self, msp, start, bearing, distance):
         dx, dy = bearing_to_delta(bearing, distance)
-        end    = (start[0] + dx, start[1] + dy)
-        msp.add_line(
-            start, end,
-            dxfattribs={"layer": self.LAYER_BOUNDARY}
-        )
+        end = (start[0] + dx, start[1] + dy)
+        msp.add_line(start, end,
+                     dxfattribs={"layer": self.LAYER_BOUNDARY})
         return end
 
-    def _draw_curve(self, msp, start: Tuple[float, float],
-                    curve: dict) -> Tuple[float, float]:
-        """Draws an arc segment. Returns end point."""
-        chord_bearing  = curve.get("bearing", "")
-        chord_distance = float(curve.get("chord_ft", 0) or 0)
-        radius         = float(curve.get("radius_ft", 0) or 0)
-        arc_length     = float(curve.get("length_ft", 0) or 0)
-        delta          = curve.get("delta", "0°00'00\"")
+    def _draw_curve(self, msp, start, seg):
+        """Draw a curve segment. Falls back to chord line if data is incomplete."""
+        chord_bearing  = seg.get("chord_bearing") or seg.get("bearing") or ""
+        chord_distance = seg.get("chord_distance") or seg.get("chord_ft")
+        radius         = seg.get("radius") or seg.get("radius_ft")
 
-        if not chord_bearing or not chord_distance or not radius:
-            # Fall back to a straight line using chord
-            return self._draw_line(msp, start, chord_bearing, chord_distance)
+        try: chord_distance = float(chord_distance) if chord_distance else 0.0
+        except (TypeError, ValueError): chord_distance = 0.0
+        try: radius = float(radius) if radius else 0.0
+        except (TypeError, ValueError): radius = 0.0
 
-        end, center, start_angle = compute_arc_endpoints(
-            start, chord_bearing, chord_distance, radius, arc_length, delta
-        )
+        if not chord_bearing or chord_distance <= 0 or radius <= 0:
+            if chord_bearing and chord_distance > 0:
+                end = self._draw_line(msp, start, chord_bearing, chord_distance)
+                msp.add_line(start, end,
+                             dxfattribs={"layer": self.LAYER_CURVES})
+                return end
+            return start
 
-        # Delta in degrees
-        delta_deg = 0.0
-        m = re.search(r'(\d+(?:\.\d+)?)°', delta or "")
-        if m:
-            delta_deg = float(m.group(1))
-            m2 = re.search(r"(\d+(?:\.\d+)?)'", delta or "")
-            if m2:
-                delta_deg += float(m2.group(1)) / 60
+        dx, dy = bearing_to_delta(chord_bearing, chord_distance)
+        end = (start[0] + dx, start[1] + dy)
+        mid_x = (start[0] + end[0]) / 2.0
+        mid_y = (start[1] + end[1]) / 2.0
+        half_chord = chord_distance / 2.0
 
-        end_angle = start_angle + delta_deg
+        if radius < half_chord:
+            radius = half_chord
+
+        sagitta = math.sqrt(max(0.0, radius * radius - half_chord * half_chord))
+        chord_angle = math.atan2(dy, dx)
+        perp = chord_angle + math.pi / 2
+
+        cx = mid_x + sagitta * math.cos(perp)
+        cy = mid_y + sagitta * math.sin(perp)
+
+        start_angle = math.degrees(math.atan2(start[1] - cy, start[0] - cx))
+        end_angle   = math.degrees(math.atan2(end[1]   - cy, end[0]   - cx))
 
         try:
             msp.add_arc(
-                center=center,
-                radius=radius,
-                start_angle=start_angle,
-                end_angle=end_angle,
-                dxfattribs={"layer": self.LAYER_CURVES}
+                center      = (cx, cy),
+                radius      = radius,
+                start_angle = start_angle,
+                end_angle   = end_angle,
+                dxfattribs  = {"layer": self.LAYER_CURVES},
             )
         except Exception as e:
-            print(f"[DXF] Arc error ({curve.get('curve_id')}): {e} "
-                  f"— drawing chord line instead")
-            msp.add_line(
-                start, end,
-                dxfattribs={"layer": self.LAYER_CURVES}
-            )
-
+            print(f"[DXF] Arc fallback for {seg.get('curve_number','?')}: {e}")
+            msp.add_line(start, end,
+                         dxfattribs={"layer": self.LAYER_CURVES})
         return end
 
+    # ─────────────────────────────────────────────
+    # ANNOTATIONS
+    # ─────────────────────────────────────────────
 
-def generate_dxf(extraction: dict, output_path: str = None) -> bytes:
-    """Convenience function — generates DXF from extraction JSON."""
+    def _annotate_segments(self, msp, seg_records, lot_size):
+        """
+        Place bearing+distance (lines) or curve_number+radius/arc (curves)
+        at the midpoint of each segment, offset perpendicular to the side.
+        Text rotation matches the segment angle, flipped if upside-down.
+        """
+        offset = max(1.5, lot_size * self.LABEL_OFFSET_FACTOR)
+        text_h = max(self.BASE_TEXT_HEIGHT, lot_size * 0.018)
+
+        for rec in seg_records:
+            if rec["kind"] == "skip":
+                continue
+            sx, sy = rec["start"]
+            ex, ey = rec["end"]
+            mx, my = (sx + ex) / 2.0, (sy + ey) / 2.0
+            angle  = math.degrees(math.atan2(ey - sy, ex - sx))
+
+            # Perpendicular offset (90° CCW from segment direction)
+            pdx = -math.sin(math.radians(angle)) * offset
+            pdy =  math.cos(math.radians(angle)) * offset
+
+            # Keep text upright
+            text_rotation = angle
+            if text_rotation > 90 or text_rotation < -90:
+                text_rotation += 180
+                pdx, pdy = -pdx, -pdy
+
+            seg = rec["seg"]
+            if rec["kind"] == "line":
+                bearing = seg.get("bearing", "")
+                dist    = seg.get("distance") or seg.get("distance_ft") or 0
+                try: dist = float(dist)
+                except (TypeError, ValueError): dist = 0.0
+                label = f"{bearing}  {dist:.2f}'"
+            else:
+                cnum  = seg.get("curve_number", "")
+                rad   = seg.get("radius") or seg.get("radius_ft")
+                arcl  = seg.get("arc_length") or seg.get("arc_length_ft")
+                parts = [cnum] if cnum else []
+                if rad:
+                    try: parts.append(f"R={float(rad):.2f}'")
+                    except (TypeError, ValueError): pass
+                if arcl:
+                    try: parts.append(f"L={float(arcl):.2f}'")
+                    except (TypeError, ValueError): pass
+                label = "  ".join(parts) if parts else "(curve)"
+
+            if not label.strip():
+                continue
+
+            t = msp.add_text(
+                label,
+                dxfattribs={
+                    "layer":    self.LAYER_ANNOT,
+                    "height":   text_h,
+                    "rotation": text_rotation,
+                },
+            )
+            t.set_placement(
+                (mx + pdx, my + pdy),
+                align=ezdxf.enums.TextEntityAlignment.MIDDLE_CENTER,
+            )
+
+    # ─────────────────────────────────────────────
+    # EASEMENTS
+    # ─────────────────────────────────────────────
+
+    def _draw_easements(self, msp, easements, all_points, lot_size):
+        if not easements:
+            return
+
+        xs = [p[0] for p in all_points] or [0.0]
+        ys = [p[1] for p in all_points] or [0.0]
+        x0 = max(xs) + max(5.0, lot_size * 0.08)
+        y0 = max(ys)
+        text_h = max(self.EASEMENT_TEXT_HEIGHT, lot_size * 0.014)
+        line_h = text_h * 1.6
+
+        msp.add_text(
+            "EASEMENTS",
+            dxfattribs={"layer": self.LAYER_EASEMENTS,
+                        "height": text_h * 1.3},
+        ).set_placement((x0, y0),
+                        align=ezdxf.enums.TextEntityAlignment.LEFT)
+
+        for i, e in enumerate(easements, start=1):
+            etype = e.get("type") or e.get("kind") or "Easement"
+            width = e.get("width_ft") or e.get("width")
+            side  = e.get("side") or e.get("location") or ""
+            parts = [str(etype)]
+            if width: parts.append(f"{width}'")
+            if side:  parts.append(f"({side})")
+            text = " ".join(parts)
+
+            msp.add_text(
+                text,
+                dxfattribs={"layer": self.LAYER_EASEMENTS,
+                            "height": text_h},
+            ).set_placement(
+                (x0, y0 - line_h * i),
+                align=ezdxf.enums.TextEntityAlignment.LEFT,
+            )
+
+
+# ─────────────────────────────────────────────
+# CONVENIENCE WRAPPER
+# ─────────────────────────────────────────────
+
+def generate_dxf(extraction: dict,
+                 output_path: Optional[str] = None) -> bytes:
     return DXFGenerator().generate(extraction, output_path)

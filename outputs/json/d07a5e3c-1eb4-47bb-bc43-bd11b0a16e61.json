@@ -1,0 +1,26 @@
+{
+  "error": "Expecting ',' delimiter: line 12 column 29 (char 228)",
+  "raw_response": "```json\n{\n  \"lot_number\": \"31\",\n  \"block_number\": \"0\",\n  \"extraction_timestamp\": \"\",\n  \"county\": \"\",\n  \"state\": \"\",\n  \"plat_book\": \"\",\n  \"plat_page\": \"\",\n  \"subdivision\": \"\",\n  \"boundaries\": {\n    \"front\": {\n      \"bearing\": \"N45\u00b012'36\"E\",\n      \"distance_ft\": 80.0,\n      \"street_name\": null,\n      \"is_curve\": false,\n      \"curve_refs\": []\n    },\n    \"rear\": {\n      \"bearing\": \"S45\u00b012'36\"W\",\n      \"distance_ft\": 75.0,\n      \"is_curve\": false,\n      \"curve_refs\": []\n    },\n    \"left_side\": {\n    ",
+  "needs_review": [
+    "entire_extraction"
+  ],
+  "extraction_confidence": "low",
+  "extraction_timestamp": "2026-05-08T12:51:14.710990",
+  "model_used": "blaifa/InternVL3",
+  "lot_number": "31",
+  "block_number": "0",
+  "inference_time_sec": 181.7,
+  "extractor_used": "internvl",
+  "fallback_reason": "claude_and_groq_unavailable",
+  "source_file": "C:\\Users\\11119\\AppData\\Local\\Temp\\tmprt_hq1_6.pdf",
+  "page_number": 0,
+  "crops_generated": [
+    "lot",
+    "curve_table_1",
+    "curve_table_2",
+    "curve_table_3",
+    "curve_table_4"
+  ],
+  "yolo_detections": 6,
+  "lot_snapshot": "d07a5e3c-1eb4-47bb-bc43-bd11b0a16e61.jpg"
+}

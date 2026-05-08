@@ -1,0 +1,84 @@
+{
+  "lot_number": "31",
+  "block_number": "0",
+  "boundaries": [
+    {
+      "segment_number": 1,
+      "type": "line",
+      "bearing": "S53\u00b007'00\"E",
+      "distance": 120.0,
+      "curve_number": "",
+      "radius": null,
+      "arc_length": null,
+      "delta": "",
+      "chord_bearing": "",
+      "chord_distance": null,
+      "table_reference": ""
+    },
+    {
+      "segment_number": 2,
+      "type": "line",
+      "bearing": "N53\u00b007'00\"W",
+      "distance": 120.0,
+      "curve_number": "",
+      "radius": null,
+      "arc_length": null,
+      "delta": "",
+      "chord_bearing": "",
+      "chord_distance": null,
+      "table_reference": ""
+    },
+    {
+      "segment_number": 3,
+      "type": "curve",
+      "bearing": "",
+      "distance": null,
+      "curve_number": "C49",
+      "radius": 20.0,
+      "arc_length": 28.61,
+      "delta": "81\u00b058'23\"",
+      "chord_bearing": "N85\u00b053'49\"E",
+      "chord_distance": 26.24,
+      "table_reference": "C49"
+    },
+    {
+      "segment_number": 4,
+      "type": "line",
+      "bearing": "N36\u00b053'00\"E",
+      "distance": 100.0,
+      "curve_number": "",
+      "radius": null,
+      "arc_length": null,
+      "delta": "",
+      "chord_bearing": "",
+      "chord_distance": null,
+      "table_reference": ""
+    }
+  ],
+  "easements": [
+    {
+      "type": "UE",
+      "width_ft": 10.0,
+      "side": "left"
+    }
+  ],
+  "total_segments": 4,
+  "extraction_confidence": "high",
+  "needs_review": [],
+  "extraction_timestamp": "2026-05-08T13:17:06.352233",
+  "model_used": "meta-llama/llama-4-scout-17b-16e-instruct",
+  "inference_time_sec": 2.5,
+  "extractor_used": "groq",
+  "fallback_reason": "claude_unavailable",
+  "source_file": "C:\\Users\\11119\\AppData\\Local\\Temp\\tmppvr132bd.pdf",
+  "page_number": 0,
+  "crops_generated": [
+    "lot",
+    "curve_table_1",
+    "curve_table_2",
+    "curve_table_3",
+    "curve_table_4"
+  ],
+  "yolo_detections": 6,
+  "lot_snapshot": "be0ca6ff-487f-4006-b210-dbf6ce95bbdd.jpg"
+}

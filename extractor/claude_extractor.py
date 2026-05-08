@@ -46,7 +46,9 @@ IMPORTANT RULES:
 5. If a value is unclear, set it to null and flag it in "needs_review"
 6. Block number is an optional hint to locate the correct lot
 7. Always identify: front, rear, left side, right side boundaries
-8. Note all easements with their type and width
+8. Keep in mind the lot sides are not fixed, meaning there may be some times 4 sides or 5 sides or mixture of sides and curves.
+9. If a curve is present,  search for curve reference number from the curve table snapshot and extract all its parameters
+10. Note all easements with their type and width
 """
 
 

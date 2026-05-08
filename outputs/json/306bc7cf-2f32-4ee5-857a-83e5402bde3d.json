@@ -1,0 +1,78 @@
+{
+  "lot_number": "33",
+  "block_number": "0",
+  "boundaries": [
+    {
+      "segment_number": 1,
+      "type": "line",
+      "bearing": "S53\u00b007'00\"E",
+      "distance": 120.0,
+      "curve_number": "",
+      "radius": null,
+      "arc_length": null,
+      "delta": "",
+      "chord_bearing": "",
+      "chord_distance": null,
+      "table_reference": ""
+    },
+    {
+      "segment_number": 2,
+      "type": "curve",
+      "bearing": "",
+      "distance": null,
+      "curve_number": "C51",
+      "radius": 475.0,
+      "arc_length": 56.38,
+      "delta": "6\u00b048'00\"",
+      "chord_bearing": "S40\u00b017'00\"W",
+      "chord_distance": 56.34,
+      "table_reference": "C51"
+    },
+    {
+      "segment_number": 3,
+      "type": "line",
+      "bearing": "N40\u00b027'42\"E",
+      "distance": 55.92,
+      "curve_number": "",
+      "radius": null,
+      "arc_length": null,
+      "delta": "",
+      "chord_bearing": "",
+      "chord_distance": null,
+      "table_reference": ""
+    },
+    {
+      "segment_number": 4,
+      "type": "line",
+      "bearing": "N53\u00b007'00\"W",
+      "distance": 50.0,
+      "curve_number": "",
+      "radius": null,
+      "arc_length": null,
+      "delta": "",
+      "chord_bearing": "",
+      "chord_distance": null,
+      "table_reference": ""
+    }
+  ],
+  "easements": [],
+  "total_segments": 4,
+  "extraction_confidence": "high",
+  "needs_review": [],
+  "extraction_timestamp": "2026-05-08T13:20:55.604962",
+  "model_used": "meta-llama/llama-4-scout-17b-16e-instruct",
+  "inference_time_sec": 2.4,
+  "extractor_used": "groq",
+  "fallback_reason": "claude_unavailable",
+  "source_file": "C:\\Users\\11119\\AppData\\Local\\Temp\\tmp8udnwk8h.pdf",
+  "page_number": 0,
+  "crops_generated": [
+    "lot",
+    "curve_table_1",
+    "curve_table_2",
+    "curve_table_3",
+    "curve_table_4"
+  ],
+  "yolo_detections": 6,
+  "lot_snapshot": "306bc7cf-2f32-4ee5-857a-83e5402bde3d.jpg"
+}
