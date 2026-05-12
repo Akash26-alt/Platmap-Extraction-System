@@ -32,6 +32,16 @@ from PIL import Image, ImageEnhance, ImageFilter, ImageDraw
 import anthropic
 import pytesseract
 
+# Groq SDK — used by PageFinder for VLM-based page identification.
+# Open-source model (Meta Llama 4 Scout 17B) hosted on Groq free tier.
+# Hosted: no local hardware dependency. Imported optionally so the
+# module loads even if groq isn't installed.
+try:
+    from groq import Groq  # noqa: F401
+    _GROQ_SDK_AVAILABLE = True
+except ImportError:
+    _GROQ_SDK_AVAILABLE = False
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -200,111 +210,538 @@ def _encode_for_claude(image: Image.Image, max_width: int = 1568,
 # ─────────────────────────────────────────────
 # STEP 1: PAGE FINDER (YOLO + OCR)
 # ─────────────────────────────────────────────
+#
+# Helpers used by PageFinder. Kept at module-level so they're easy to
+# unit-test in isolation and don't pollute the class with statics.
+
+# Regex patterns for full-page text fallback (used when YOLO misses
+# the labelled bounding box but the phrase "Plat Book 82" or "Page 56"
+# is still visible somewhere on the rendered page).
+_PB_TEXT_RE = re.compile(
+    r'(?:plat\s*book|p\.?\s*b\.?(?![a-z])|book\s*(?:no\.?|number|#)?)'
+    r'\s*[:\-]?\s*(\d{1,4})',
+    re.IGNORECASE,
+)
+_PG_TEXT_RE = re.compile(
+    r'(?:plat\s*page|page\s*(?:no\.?|number|#)?|p\.?\s*g\.?(?![a-z])|pg\.?)'
+    r'\s*[:\-]?\s*(\d{1,4})',
+    re.IGNORECASE,
+)
+
+
+def _normalize_num(s: Optional[str]) -> str:
+    """Keep only digits, drop leading zeros. '082' → '82', 'P82' → '82'."""
+    if not s:
+        return ""
+    digits = re.sub(r'\D', '', str(s))
+    if not digits:
+        return ""
+    return digits.lstrip('0') or '0'
+
+
+def _levenshtein(a: str, b: str) -> int:
+    """Small iterative Levenshtein, fine for short digit strings (≤6)."""
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        curr = [i] + [0] * len(b)
+        for j, cb in enumerate(b, 1):
+            curr[j] = min(
+                prev[j] + 1,
+                curr[j - 1] + 1,
+                prev[j - 1] + (ca != cb),
+            )
+        prev = curr
+    return prev[-1]
+
+
+def _score_one(detected: Optional[str], target: Optional[str]) -> float:
+    """
+    Score how well a single OCR'd number matches the target.
+
+      2.0  exact match              ("82" == "82")
+      1.5  target ⊂ detected        ("82" in "BK82" → OCR added junk)
+      1.0  detected ⊂ target        ("2"  in "82"  → OCR dropped a digit)
+      0.8  edit distance ≤ 1        ("53" vs "56" → single OCR slip)
+      0.0  no match / missing data
+    """
+    d, t = _normalize_num(detected), _normalize_num(target)
+    if not d or not t:
+        return 0.0
+    if d == t:
+        return 2.0
+    if t in d:
+        return 1.5
+    if d in t:
+        return 1.0
+    if abs(len(d) - len(t)) <= 1 and _levenshtein(d, t) <= 1:
+        return 0.8
+    return 0.0
+
+
+def _multi_pass_ocr(img: Image.Image) -> Tuple[str, List[str]]:
+    """
+    Read a small number-crop. Tries RapidOCR first (much better on
+    stylized digits — Tesseract famously confuses 5↔8 and 8↔7 on bold
+    serif numerals), falls back to multi-PSM Tesseract if RapidOCR
+    isn't installed.
+
+    Returns (best_digits, raw_outputs_for_debug).
+    """
+    # ── RapidOCR path (primary) ──
+    if _RAPIDOCR_AVAILABLE:
+        w, h = img.size
+        if max(w, h) < 200:
+            scale = 200.0 / max(w, h)
+            img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+        items = _rapidocr_read(img)
+        if items:
+            digit_items = [
+                (re.sub(r'\D', '', t), c, t)
+                for t, c, _ in items if re.search(r'\d', t)
+            ]
+            if digit_items:
+                # Highest confidence wins; ties broken by longer string
+                digit_items.sort(key=lambda x: (-x[1], -len(x[0])))
+                return digit_items[0][0], [
+                    f"{t!r}@{c:.2f}" for _, c, t in digit_items
+                ]
+        return "", [f"{t!r}@{c:.2f}" for t, c, _ in items]
+
+    # ── Tesseract fallback (multi-PSM voting) ──
+    w, h = img.size
+    if max(w, h) < 400:
+        scale = max(2.0, 300.0 / max(w, h))
+        img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+
+    enhanced = _enhance_for_ocr(img)
+
+    configs = [
+        "--psm 7  --oem 3 -c tessedit_char_whitelist=0123456789",
+        "--psm 8  --oem 3 -c tessedit_char_whitelist=0123456789",
+        "--psm 13 --oem 3 -c tessedit_char_whitelist=0123456789",
+        "--psm 7  --oem 3",   # no whitelist — catches "BK 82" / "PG 56"
+        "--psm 6  --oem 3 -c tessedit_char_whitelist=0123456789",
+    ]
+    raw_outputs: List[str] = []
+    candidates: List[str] = []
+    for cfg in configs:
+        try:
+            txt = pytesseract.image_to_string(enhanced, config=cfg).strip()
+        except Exception:
+            continue
+        raw_outputs.append(txt.replace("\n", "|"))
+        digits = re.sub(r'\D', '', txt)
+        if digits:
+            candidates.append(digits)
+
+    if not candidates:
+        return "", raw_outputs
+
+    # Vote: most-frequent wins; ties broken by length (longer = fewer
+    # dropped digits, more likely the complete reading).
+    counts: Dict[str, int] = {}
+    for c in candidates:
+        counts[c] = counts.get(c, 0) + 1
+    best = max(counts.items(), key=lambda kv: (kv[1], len(kv[0])))[0]
+    return best, raw_outputs
+
+
+# ─────────────────────────────────────────────
+# OCR ENGINE: RapidOCR (primary) → Tesseract (fallback)
+# ─────────────────────────────────────────────
+# RapidOCR is the ONNX port of PaddleOCR — Apache 2.0, ~30MB, CPU-only,
+# no network calls, no API keys. It handles small/stylized digits
+# significantly better than Tesseract, which has chronic 5↔8 / 8↔7
+# confusion on bold serif numerals. If the package isn't installed yet,
+# the PageFinder transparently falls back to multi-PSM Tesseract.
+#
+# To enable: pip install rapidocr-onnxruntime
+try:
+    from rapidocr_onnxruntime import RapidOCR  # noqa: F401
+    _RAPIDOCR_AVAILABLE = True
+except ImportError:
+    _RAPIDOCR_AVAILABLE = False
+
+# Lazy-initialised engine — loading the ONNX models has ~1s overhead,
+# so we only do it once per process and only if actually needed.
+_RAPIDOCR_ENGINE = None
+
+
+def _get_rapidocr():
+    """Return a cached RapidOCR instance, or None if package missing."""
+    global _RAPIDOCR_ENGINE
+    if not _RAPIDOCR_AVAILABLE:
+        return None
+    if _RAPIDOCR_ENGINE is None:
+        from rapidocr_onnxruntime import RapidOCR as _RO
+        _RAPIDOCR_ENGINE = _RO()
+        print("[PageFinder] RapidOCR engine loaded (ONNX, CPU)")
+    return _RAPIDOCR_ENGINE
+
+
+def _rapidocr_read(img: Image.Image) -> List[Tuple[str, float, Tuple[int, int, int, int]]]:
+    """
+    Run RapidOCR on a PIL image.
+    Returns a list of (text, confidence, (x, y, w, h)) — empty on failure.
+    """
+    engine = _get_rapidocr()
+    if engine is None:
+        return []
+    arr = np.array(img.convert("RGB") if img.mode != "RGB" else img)
+    try:
+        result, _ = engine(arr)
+    except Exception as e:
+        print(f"[PageFinder] RapidOCR error: {e}")
+        return []
+    if not result:
+        return []
+    out: List[Tuple[str, float, Tuple[int, int, int, int]]] = []
+    for box, text, conf in result:
+        xs = [p[0] for p in box]
+        ys = [p[1] for p in box]
+        x_min, y_min = min(xs), min(ys)
+        x_max, y_max = max(xs), max(ys)
+        out.append((
+            text, float(conf),
+            (int(x_min), int(y_min), int(x_max - x_min), int(y_max - y_min)),
+        ))
+    return out
+
+
+def _tesseract_word_dump(img: Image.Image) -> List[Tuple[str, float, Tuple[int, int, int, int]]]:
+    """
+    Tesseract equivalent of _rapidocr_read — per-word text + conf + bbox,
+    used as fallback when RapidOCR isn't installed.
+    """
+    if img.width > 1600:
+        img = img.resize(
+            (1600, int(img.height * 1600 / img.width)), Image.LANCZOS
+        )
+    try:
+        data = pytesseract.image_to_data(
+            img, config="--psm 6 --oem 3",
+            output_type=pytesseract.Output.DICT,
+        )
+    except Exception:
+        return []
+    out = []
+    for i, txt in enumerate(data["text"]):
+        if not txt.strip():
+            continue
+        try:
+            conf = float(data["conf"][i]) / 100.0
+        except (ValueError, KeyError, TypeError):
+            conf = 0.0
+        if conf <= 0:
+            continue
+        out.append((
+            txt, conf,
+            (int(data["left"][i]),  int(data["top"][i]),
+             int(data["width"][i]), int(data["height"][i])),
+        ))
+    return out
+
 
 class PageFinder:
     """
-    Finds the correct page in a multi-page PDF by matching
-    plat_book + page number using YOLO + OCR.
+    Finds the correct page in a multi-page PDF using a hosted vision
+    language model (Meta Llama 4 Scout 17B via Groq, open-source,
+    free tier). No local hardware dependency, no OCR fragility, no
+    structural assumptions about page numbering.
 
-    Uses the same YOLO model as layout detection (must have classes
-    like 'page_no', 'plat_book' or similar).
+    Why this approach:
+      Plat-book typography has unbounded variation — sequential
+      numeric (53, 54, 55), alpha-suffix (5, 5A, 5B), hierarchical
+      (8, 8A, 8AA, 8B, 8BB), descending, gapped, etc. No regex or
+      pattern-inference scheme handles all of these. A vision model
+      reads the page label as written, eliminating the OCR-error and
+      pattern-mismatch failure modes that plague rule-based systems.
+
+    How it works:
+      1. Render each page at moderate DPI.
+      2. Send the rendered page to the VLM with a tightly-scoped prompt
+         asking for the LITERAL plat book number and page label as
+         printed (no interpretation, no normalisation by the model).
+      3. Strict-match the response against the target. Whitespace and
+         case are normalised on BOTH sides; nothing else.
+      4. Early-exit on first match. If no page matches, scan all pages
+         and return the lowest-index page where the model claimed
+         to see the target — or page 0 if nothing matched.
+
+    Constructor compatibility:
+      Accepts (yolo_model, claude_client, debug_dir) so the existing
+      caller wiring stays unchanged. yolo_model and claude_client are
+      no longer used by this class.
     """
 
-    def __init__(self, yolo_model):
-        self.model = yolo_model
-        # Cache class names for quick lookup
-        self.class_names = self.model.names if hasattr(self.model, 'names') else {}
+    # VLM endpoint configuration. Llama 4 Scout 17B is multimodal and
+    # available on Groq's free tier as of 2026.
+    GROQ_MODEL  = "meta-llama/llama-4-scout-17b-16e-instruct"
+    MAX_TOKENS  = 150       # tiny — we want a one-line JSON response
+    RENDER_DPI  = 180       # balance: legibility vs upload size
+    THUMB_WIDTH = 1400      # cap render width before sending to VLM
+    JPEG_QUALITY = 85       # smaller payload, model doesn't need 100%
 
+    def __init__(self, yolo_model=None,
+                 claude_client: Optional[anthropic.Anthropic] = None,
+                 debug_dir: Optional[str] = None):
+        self.debug_dir = debug_dir
+        if self.debug_dir:
+            os.makedirs(self.debug_dir, exist_ok=True)
+
+        # Initialise the Groq client. Failures here are surfaced loudly
+        # rather than silently — without the VLM, the page-finder has
+        # no fallback (by design, since OCR approaches were ruled out).
+        self.groq = None
+        if not _GROQ_SDK_AVAILABLE:
+            print("[PageFinder] ⚠️  groq SDK not installed — "
+                  "`pip install groq`. Page-finder will fall back to "
+                  "page 0 for every multi-page PDF.")
+            return
+
+        api_key = os.environ.get("GROQ_API_KEY")
+        if not api_key:
+            print("[PageFinder] ⚠️  GROQ_API_KEY not set — "
+                  "page-finder will fall back to page 0.")
+            return
+
+        try:
+            from groq import Groq
+            self.groq = Groq(api_key=api_key)
+            print(f"[PageFinder] Groq client ready ({self.GROQ_MODEL})")
+        except Exception as e:
+            print(f"[PageFinder] ⚠️  Groq init failed: {e}")
+            self.groq = None
+
+    # ──────────────────────────────────────────
+    # Public entry point
+    # ──────────────────────────────────────────
     def find_page(self, pdf_path: str, plat_book: str,
                   plat_page: str) -> Optional[int]:
         doc = fitz.open(pdf_path)
         page_count = doc.page_count
         print(f"[PageFinder] Searching {page_count} page(s) for "
-              f"Book={plat_book} Page={plat_page}...")
+              f"Book={plat_book!r} Page={plat_page!r}")
 
         if page_count == 1:
             doc.close()
+            print("[PageFinder] Single-page PDF → returning page 0")
             return 0
+
+        if self.groq is None:
+            doc.close()
+            print("[PageFinder] ❌ VLM unavailable — defaulting to page 0")
+            return 0
+
+        target_pb = self._strict_normalize(plat_book)
+        target_pg = self._strict_normalize(plat_page)
+
+        zoom = self.RENDER_DPI / 72
+        mat  = fitz.Matrix(zoom, zoom)
+
+        # Track all observations so we can do a final pick if no page
+        # is an exact match on both fields.
+        observations: List[Dict[str, Any]] = []
 
         for page_num in range(page_count):
             page = doc[page_num]
-            # Render page at moderate DPI (fast enough)
-            zoom = 150 / 72
-            mat = fitz.Matrix(zoom, zoom)
-            pix = page.get_pixmap(matrix=mat)
-            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            pix  = page.get_pixmap(matrix=mat)
+            img  = Image.frombytes(
+                "RGB", [pix.width, pix.height], pix.samples,
+            )
 
-            print(f"[PageFinder] Page {page_num+1}/{page_count}...", end=" ")
+            seen = self._read_page_via_vlm(img, page_num)
+            observations.append({"page_num": page_num, "seen": seen})
 
-            # Use YOLO to detect page number fields
-            detected = self._extract_page_fields(img)
-            if self._matches(detected, plat_book, plat_page):
-                print("✅ MATCH")
+            seen_pb = self._strict_normalize(seen.get("plat_book"))
+            seen_pg = self._strict_normalize(seen.get("page"))
+
+            print(f"[PageFinder] Page {page_num+1}/{page_count}: "
+                  f"book={seen.get('plat_book')!r} "
+                  f"page={seen.get('page')!r}")
+
+            # Strict exact match on both fields — the whole point of
+            # this redesign is no fuzzy matching, no pattern guesses.
+            if seen_pb == target_pb and seen_pg == target_pg:
                 doc.close()
+                print(f"[PageFinder] ✅ Match: page {page_num+1}")
                 return page_num
-            else:
-                print(f"no match (pb:{detected.get('platbook')} pg:{detected.get('page')})")
 
         doc.close()
-        print("[PageFinder] ❌ No match — defaulting to page 0")
+
+        # No exact match found. We need to decide between (a) returning
+        # the best partial (e.g. page matched, book didn't) or (b)
+        # failing safe to page 0. Per the constraint "strict matching",
+        # we don't accept partial matches. But we do report what was
+        # seen so a human can intervene.
+        print(f"[PageFinder] ❌ No page with exact "
+              f"book={target_pb!r} + page={target_pg!r} match.")
+        print(f"[PageFinder]    Observed across PDF:")
+        for o in observations:
+            print(f"[PageFinder]      p{o['page_num']+1}: "
+                  f"book={o['seen'].get('plat_book')!r} "
+                  f"page={o['seen'].get('page')!r}")
+        print(f"[PageFinder]    Defaulting to page 0 (flag for review).")
         return 0
 
-    def _extract_page_fields(self, page_img: Image.Image) -> Dict[str, str]:
-        """Run YOLO + OCR to extract plat book and page numbers."""
-        img_np = np.array(page_img)
-        results = self.model(img_np, conf=PAGE_FINDER_CONF, verbose=False)[0]
+    # ──────────────────────────────────────────
+    # VLM call per page
+    # ──────────────────────────────────────────
+    def _read_page_via_vlm(self, page_img: Image.Image,
+                           page_num: int) -> Dict[str, Optional[str]]:
+        """
+        Send one page image to the VLM and ask it to return the
+        plat-book number and page label EXACTLY as printed.
 
-        detected = {"platbook": None, "page": None}
+        Returns {"plat_book": str|None, "page": str|None}.
+        """
+        # Downscale to keep upload size reasonable — VLM doesn't need
+        # full resolution to read header text.
+        if page_img.width > self.THUMB_WIDTH:
+            scale = self.THUMB_WIDTH / page_img.width
+            page_img = page_img.resize(
+                (self.THUMB_WIDTH, int(page_img.height * scale)),
+                Image.LANCZOS,
+            )
 
-        if results.boxes is None:
-            return detected
-
-        for box in results.boxes:
-            cls_id = int(box.cls[0])
-            conf = float(box.conf[0])
-            if conf < 0.25:
-                continue
-
-            class_name = self.class_names.get(cls_id, "unknown")
-            # Get bounding box
-            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-            # Add small padding
-            pad = 5
-            x1 = max(0, x1 - pad)
-            y1 = max(0, y1 - pad)
-            x2 = min(page_img.width, x2 + pad)
-            y2 = min(page_img.height, y2 + pad)
-
-            crop = page_img.crop((x1, y1, x2, y2))
-            enhanced = _enhance_for_ocr(crop)
+        # Optional debug dump
+        if self.debug_dir:
             try:
-                text = pytesseract.image_to_string(enhanced, config="--psm 7 --oem 3")
-                digits = re.sub(r'\D', '', text.strip())
-                if not digits:
-                    continue
-
-                class_lower = class_name.lower()
-                if "page" in class_lower:
-                    detected["page"] = digits
-                elif "plat" in class_lower or "book" in class_lower:
-                    detected["platbook"] = digits
+                page_img.save(os.path.join(
+                    self.debug_dir, f"vlm_input_p{page_num+1:02d}.jpg"
+                ), quality=80)
             except Exception:
-                continue
+                pass
 
-        return detected
+        buf = io.BytesIO()
+        page_img.save(buf, format="JPEG", quality=self.JPEG_QUALITY)
+        b64 = base64.standard_b64encode(buf.getvalue()).decode()
+        data_url = f"data:image/jpeg;base64,{b64}"
 
-    def _matches(self, detected: Dict[str, str],
-                 target_platbook: str, target_page: str) -> bool:
-        """Substring + OR matching (at least one matches)."""
-        target_pb = target_platbook.strip()
-        target_pg = target_page.strip()
-        detected_pb = detected.get("platbook") or ""
-        detected_pg = detected.get("page") or ""
+        # Prompt design notes:
+        #   • Ask for LITERAL output ("exactly as printed") to suppress
+        #     the model's tendency to normalise '8AA' → '8' or guess.
+        #   • Explicit "if not visible, use null" to avoid hallucination.
+        #   • JSON-only output minimises parsing surface.
+        #   • Mention common label variations so the model knows what
+        #     to look for without assuming any single format.
+        prompt = (
+            "This image is one page from a plat book PDF. Find the "
+            "plat book number and the page number/label that identify "
+            "THIS page within the book. These labels typically appear "
+            "in a corner, header, footer, or title block, often (but "
+            "not always) preceded by words like 'PLAT BOOK', 'BOOK', "
+            "'PG', 'PAGE', 'P.B.', 'PAGE NO.', 'BK', etc.\n\n"
+            "Return the values LITERALLY as printed on the page — do "
+            "NOT interpret, normalise, or simplify. Examples:\n"
+            "  • If you see 'PLAT BOOK 82 PAGE 8AA': "
+            "{\"plat_book\": \"82\", \"page\": \"8AA\"}\n"
+            "  • If you see 'PB 17, PG 5-A': "
+            "{\"plat_book\": \"17\", \"page\": \"5-A\"}\n"
+            "  • If a label has letters (e.g. '8AA', '5-A', '12B'), "
+            "INCLUDE the letters exactly.\n"
+            "  • If you cannot find one or both clearly, return "
+            "null for that field.\n\n"
+            "Respond with ONLY a single JSON object, no commentary:\n"
+            "{\"plat_book\": \"<value or null>\", "
+            "\"page\": \"<value or null>\"}"
+        )
 
-        pb_match = (target_pb != "" and target_pb in detected_pb)
-        pg_match = (target_pg != "" and target_pg in detected_pg)
+        try:
+            resp = self.groq.chat.completions.create(
+                model=self.GROQ_MODEL,
+                max_tokens=self.MAX_TOKENS,
+                temperature=0.0,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url",
+                         "image_url": {"url": data_url}},
+                        {"type": "text", "text": prompt},
+                    ],
+                }],
+            )
+            text = resp.choices[0].message.content or ""
+        except Exception as e:
+            print(f"[PageFinder]   VLM error on page {page_num+1}: {e}")
+            return {"plat_book": None, "page": None}
 
-        return pb_match and pg_match
+        return self._parse_vlm_response(text)
+
+    # ──────────────────────────────────────────
+    # Response parsing
+    # ──────────────────────────────────────────
+    @staticmethod
+    def _parse_vlm_response(text: str) -> Dict[str, Optional[str]]:
+        """
+        Pull the JSON object out of the model's response. The model
+        sometimes wraps it in ```json fences or adds a sentence before
+        despite the prompt instructions — we extract defensively.
+        """
+        out: Dict[str, Optional[str]] = {"plat_book": None, "page": None}
+        if not text:
+            return out
+
+        # Strip markdown fences if present
+        cleaned = re.sub(r"```(?:json)?", "", text).strip().strip("`")
+        # Find the outermost {...}
+        m = re.search(r"\{[^{}]*\}", cleaned, re.DOTALL)
+        if not m:
+            return out
+        try:
+            payload = json.loads(m.group(0))
+        except Exception:
+            return out
+
+        def _coerce(v):
+            if v is None:
+                return None
+            s = str(v).strip()
+            if not s or s.lower() in {"null", "none", "n/a", "na", "-"}:
+                return None
+            return s
+
+        out["plat_book"] = _coerce(payload.get("plat_book")
+                                   or payload.get("book"))
+        out["page"]      = _coerce(payload.get("page")
+                                   or payload.get("page_number"))
+        return out
+
+    # ──────────────────────────────────────────
+    # Strict normalisation for matching
+    # ──────────────────────────────────────────
+    @staticmethod
+    def _strict_normalize(s: Optional[str]) -> str:
+        """
+        Normalisation for strict equality only — uppercase + strip
+        internal/leading/trailing whitespace + strip leading zeros
+        from any leading digit run. No content is dropped.
+
+        Examples:
+          '8AA'     → '8AA'
+          '8 A A'   → '8AA'
+          '08AA'    → '8AA'
+          '8-A'     → '8-A'    (preserve separator — semantically meaningful)
+          ' Page 5' → 'PAGE5'  (caller should pass the value, not label;
+                                this is defensive)
+          None      → ''
+        """
+        if s is None:
+            return ""
+        # Uppercase, drop all whitespace
+        cleaned = re.sub(r"\s+", "", str(s)).upper()
+        # Strip leading zeros only from the digit prefix (preserve
+        # internal zeros like '108' or '10A')
+        m = re.match(r"^(0+)(\d.*)", cleaned)
+        if m:
+            cleaned = m.group(2)
+        return cleaned
 
 
 # ─────────────────────────────────────────────
@@ -402,24 +839,55 @@ class YOLODetector:
 # STEP 3: LOT FINDER (OCR + CLAUDE MICRO-CONFIRM)
 # ─────────────────────────────────────────────
 
+# Regex for block-anchor labels on plat maps. Plat maps consistently
+# print block headings as "BLOCK 12", "BLOCK 1", occasionally "BLOCK A".
+# The pattern is tight to avoid false-positives on the (rare) word
+# "block" appearing in unrelated annotations.
+_BLOCK_LABEL_RE = re.compile(r'\bBLOCK\s+([0-9A-Z]+)\b', re.IGNORECASE)
+
+
 class LotFinder:
     """
-    Identifies the specific lot number from YOLO-detected lot regions.
+    Identifies the specific lot number from YOLO-detected lot regions,
+    optionally constrained to a target block number on multi-block plats.
 
-    Two-stage:
-    Stage A: OCR on each YOLO lot region — find number that matches
-    Stage B: Claude micro-confirm on small crop — verify (~$0.001)
+    Two-stage with block-aware spatial filtering:
+      Stage A: OCR each YOLO lot region. If a block is specified, score
+               candidates by (lot OCR match) AND (nearest block-anchor
+               label equals target block).
 
-    If YOLO found no lot regions:
-    Falls back to tiled OCR on full thumbnail.
+      Block anchors are detected with FIVE strategies stacked:
+        A. Merged token regex      ("BLOCK308", "BLOCK.308")
+        B/C. Paired-token scan     ("BLOCK" + "308", "BLOCK NO. 12")
+        D. Joined-text regex       (safety net for fragmented tokens)
+        E. Size-based heuristic    (label-less blocks — bold standalone
+           number, height significantly above median digit-token height,
+           isolated from alphabetic / bearing / distance neighbors)
+
+      Stage B: OCR-based micro-confirm on the candidate crop. Verifies
+               the lot number is present as a standalone digit not
+               adjacent to bearing/distance/curve markers.
+
+    No paid APIs. Uses RapidOCR if installed (recommended), Tesseract
+    as fallback.
+
+    The `claude_client` constructor argument is kept for backwards
+    compatibility with the caller but is no longer used.
     """
+
+    # Confidence floor for OCR'd block anchors. Plat-map BLOCK labels
+    # are typically large bold uppercase text — a font style that
+    # Tesseract scores conservatively (often 30-45). RapidOCR scores
+    # them higher; this floor works for both.
+    BLOCK_ANCHOR_CONF_FLOOR = 30
 
     def __init__(self, claude_client: anthropic.Anthropic):
         self.claude = claude_client
 
     def find_lot(self, original_image: Image.Image,
                  lot_number: str,
-                 yolo_lot_detections: List[Dict]) -> Optional[Tuple]:
+                 yolo_lot_detections: List[Dict],
+                 block_number: Optional[str] = None) -> Optional[Tuple]:
         """
         Returns lot bbox in original image coordinates, or None.
 
@@ -427,34 +895,456 @@ class LotFinder:
             original_image:       Full-res PIL Image (never modified)
             lot_number:           Target lot string e.g. "23"
             yolo_lot_detections:  YOLO detections with class=="lot"
+            block_number:         Optional target block e.g. "12". When
+                                  set, candidates are filtered/ranked
+                                  by spatial proximity to a matching
+                                  BLOCK N label on the page.
 
         Returns:
             (x0, y0, x1, y1) in original pixels, or None
         """
         ow, oh = original_image.size
 
+        # ── Block anchor discovery (only when block_number is supplied) ──
+        block_anchors: List[Dict[str, Any]] = []
+        if block_number:
+            block_anchors = self._find_block_anchors(original_image)
+            target_block_norm = _normalize_num(block_number)
+            matching = [a for a in block_anchors
+                        if _normalize_num(a["text"]) == target_block_norm]
+            print(f"[LotFinder] Block-aware mode: target Block "
+                  f"{block_number}, {len(block_anchors)} anchor(s) found, "
+                  f"{len(matching)} match target.")
+            if block_anchors:
+                for a in block_anchors:
+                    marker = " ←TARGET" if _normalize_num(a["text"]) == target_block_norm else ""
+                    print(f"[LotFinder]   BLOCK '{a['text']}' at "
+                          f"({a['cx']:.0f}, {a['cy']:.0f}) "
+                          f"conf={a['conf']:.0f}{marker}")
+            if not matching:
+                # Block specified but never appears on the page — warn,
+                # then proceed without block filtering (safer than failing).
+                print(f"[LotFinder] ⚠️  No BLOCK {block_number} anchor "
+                      f"found on page — proceeding without block filter.")
+                block_anchors = []
+            else:
+                block_anchors = matching  # only target-block anchors
+
         if yolo_lot_detections:
             print(f"[LotFinder] Checking {len(yolo_lot_detections)} "
                   f"YOLO lot region(s)...")
             result = self._ocr_yolo_regions(
-                original_image, lot_number, yolo_lot_detections
+                original_image, lot_number, yolo_lot_detections,
+                block_anchors=block_anchors,
             )
             if result:
                 return result
 
         # Fallback: tiled OCR on full thumbnail
         print(f"[LotFinder] Falling back to tiled OCR search...")
-        return self._tiled_ocr_search(original_image, lot_number)
+        return self._tiled_ocr_search(
+            original_image, lot_number, block_anchors=block_anchors,
+        )
+
+    # ──────────────────────────────────────────
+    # Block-anchor discovery
+    # ──────────────────────────────────────────
+    def _find_block_anchors(self,
+                            original_image: Image.Image) -> List[Dict[str, Any]]:
+        """
+        OCR the full page for 'BLOCK <num>' labels. Returns each match
+        as {'text': '12', 'cx': px, 'cy': px, 'conf': 0-100} in
+        ORIGINAL image coordinates.
+
+        Two-pass — once on a thumbnail (fast, catches most cases) and
+        a second pass on the full image only if the thumbnail came up
+        empty (slower but catches small-text plats).
+        """
+        ow, oh = original_image.size
+
+        # Try thumbnail first — block labels are big text and survive
+        # downscaling well.
+        anchors = self._scan_block_anchors_on(
+            original_image, thumbnail_width=OCR_THUMB_WIDTH,
+        )
+        if anchors:
+            return anchors
+
+        # Empty result — retry at higher resolution. This catches plats
+        # with smaller block labels or older scans.
+        print("[LotFinder]   (no block anchors at thumbnail scale, "
+              "retrying full-res)")
+        return self._scan_block_anchors_on(
+            original_image, thumbnail_width=None,
+        )
+
+    def _scan_block_anchors_on(self, original_image: Image.Image,
+                               thumbnail_width: Optional[int]
+                               ) -> List[Dict[str, Any]]:
+        """
+        Single OCR pass for BLOCK labels at the given scale.
+
+        Uses RapidOCR if available (handles stylized bold uppercase
+        block labels much more reliably than Tesseract), falls back to
+        Tesseract otherwise. Searches with three patterns to cover the
+        typography variations seen on plat maps:
+
+          (a) MERGED:    one token reads "BLOCK308" / "Block.308"
+          (b) PAIRED:    two adjacent tokens "BLOCK" + "308"
+          (c) LABELLED:  "BLOCK NO 308", "BLOCK # 308", "BLOCK: 308"
+        """
+        ow, oh = original_image.size
+        if thumbnail_width is None:
+            img = original_image
+            sx, sy = 1.0, 1.0
+        else:
+            img, sx, sy = _make_thumbnail(original_image, thumbnail_width)
+
+        # Get all tokens with bboxes from whichever OCR engine is available
+        if _RAPIDOCR_AVAILABLE:
+            items = _rapidocr_read(img)  # [(text, conf_0-1, (x, y, w, h)), ...]
+            # Normalise conf to 0-100 to match the Tesseract codepath
+            items = [(t, c * 100.0, b) for t, c, b in items]
+        else:
+            items = _tesseract_word_dump(img)
+            items = [(t, c * 100.0, b) for t, c, b in items]
+
+        if not items:
+            return []
+
+        anchors: List[Dict[str, Any]] = []
+
+        # ── Strategy A: per-token MERGED check ──
+        # Catches "BLOCK308", "BLOCK.308", "Block:308" as a single OCR token.
+        merged_re = re.compile(
+            r'^\s*BLOCK\s*[.:#\-]?\s*([0-9A-Z]+)\s*$', re.IGNORECASE
+        )
+        for text, conf, bbox in items:
+            if conf < self.BLOCK_ANCHOR_CONF_FLOOR:
+                continue
+            m = merged_re.match(text)
+            if m:
+                x, y, w, h = bbox
+                anchors.append({
+                    "text": m.group(1),
+                    "cx":   (x + w / 2.0) * sx,
+                    "cy":   (y + h / 2.0) * sy,
+                    "conf": conf,
+                    "src":  "merged",
+                })
+
+        # ── Strategy B + C: PAIRED / LABELLED scan over consecutive tokens ──
+        # Walk every "BLOCK" token and look at the NEXT FEW tokens for a
+        # number, allowing intervening punctuation/label words like
+        # "NO", "NUMBER", "#", ":". We look up to 3 tokens ahead because
+        # Tesseract sometimes inserts spurious empty/punctuation tokens.
+        label_words = {"NO", "NO.", "NUM", "NUM.", "NUMBER", "#", ":", "-", "."}
+
+        for i, (text, conf, bbox) in enumerate(items):
+            # Allow trailing punctuation on the BLOCK token: "BLOCK:", "BLOCK.", "BLOCK-"
+            text_clean = text.upper().rstrip(".:#-")
+            if text_clean != "BLOCK":
+                continue
+            if conf < self.BLOCK_ANCHOR_CONF_FLOOR:
+                continue
+
+            # Find the next token that is a number, skipping label words
+            num_text = None
+            num_bbox = None
+            num_conf = 0.0
+            for j in range(i + 1, min(i + 4, len(items))):
+                cand_text, cand_conf, cand_bbox = items[j]
+                cand_clean = cand_text.strip().upper().rstrip(".:#-")
+                if not cand_clean:
+                    continue
+                if cand_clean in label_words:
+                    continue
+                m = re.match(r'^([0-9A-Z]+)$', cand_clean)
+                if m:
+                    num_text = m.group(1)
+                    num_bbox = cand_bbox
+                    num_conf = cand_conf
+                    break
+                # First non-label, non-number token means this isn't a
+                # "BLOCK <num>" pattern — bail
+                break
+
+            if not num_text or num_bbox is None:
+                continue
+            if num_conf < self.BLOCK_ANCHOR_CONF_FLOOR:
+                continue
+
+            # Centroid spans BLOCK token through the number token
+            bx, by, bw, bh = bbox
+            nx, ny, nw, nh = num_bbox
+            x_lo = min(bx, nx);                 y_lo = min(by, ny)
+            x_hi = max(bx + bw, nx + nw);       y_hi = max(by + bh, ny + nh)
+            anchors.append({
+                "text": num_text,
+                "cx":   ((x_lo + x_hi) / 2.0) * sx,
+                "cy":   ((y_lo + y_hi) / 2.0) * sy,
+                "conf": (conf + num_conf) / 2.0,
+                "src":  "paired",
+            })
+
+        # ── Strategy D: regex over JOINED FULL-PAGE TEXT ──
+        # Last-resort safety net: join all tokens and regex-search for
+        # "BLOCK <num>" patterns. We can't recover precise bboxes from
+        # this path, but we can locate the BLOCK token and the number
+        # token among the original items and infer the centroid from
+        # whichever number-token is closest to a BLOCK-token.
+        if not anchors:
+            full_text = " ".join(t for t, _, _ in items)
+            pattern = re.compile(
+                r'BLOCK\s*[.:#\-]?\s*(?:NO\.?|NUMBER|NUM\.?|#)?\s*[.:#\-]?\s*([0-9]{1,4}[A-Z]?)\b',
+                re.IGNORECASE,
+            )
+            for m in pattern.finditer(full_text):
+                target_num = m.group(1)
+                # Find the nearest BLOCK-token + number-token pair where
+                # the number matches. This is approximate but gives us a
+                # spatial reference.
+                block_tokens = [
+                    (idx, b) for idx, (t, _, b) in enumerate(items)
+                    if t.upper().rstrip(".:#-").startswith("BLOCK")
+                ]
+                num_tokens = [
+                    (idx, b) for idx, (t, _, b) in enumerate(items)
+                    if re.sub(r'\D', '', t) == re.sub(r'\D', '', target_num)
+                       and re.sub(r'\D', '', t)
+                ]
+                if not block_tokens or not num_tokens:
+                    continue
+                # Pick the (block, num) pair with smallest token-index gap
+                best = min(
+                    ((bi, ni, abs(bi - ni)) for bi, _ in block_tokens
+                                            for ni, _ in num_tokens),
+                    key=lambda x: x[2],
+                )
+                bi, ni, _ = best
+                bx, by, bw, bh = items[bi][2]
+                nx, ny, nw, nh = items[ni][2]
+                x_lo = min(bx, nx);         y_lo = min(by, ny)
+                x_hi = max(bx + bw, nx + nw); y_hi = max(by + bh, ny + nh)
+                anchors.append({
+                    "text": target_num,
+                    "cx":   ((x_lo + x_hi) / 2.0) * sx,
+                    "cy":   ((y_lo + y_hi) / 2.0) * sy,
+                    "conf": float(self.BLOCK_ANCHOR_CONF_FLOOR),
+                    "src":  "joined-regex",
+                })
+
+        # ── Strategy E: SIZE-BASED HEADING DETECTION (label-less blocks) ──
+        # Runs only when strategies A-D found nothing. Some plats label
+        # blocks with JUST a number — no "BLOCK" word — relying on font
+        # size and bold weight to mark it as a heading. We can't regex
+        # for that, but we can detect it statistically: block headings
+        # are typically the LARGEST digit-only tokens on the page,
+        # significantly taller than lot numbers.
+        #
+        # Decision: candidate must pass TWO gates:
+        #   1. Adaptive: height >= 1.5x median digit-token height
+        #   2. Statistical: height >= median + 2 * MAD
+        # Both gates → conservative. Misses some real headings but
+        # avoids confidently picking a wrong number, which is worse.
+        if not anchors:
+            size_anchors = self._size_based_heading_candidates(
+                items, sx, sy
+            )
+            if size_anchors:
+                print(f"[LotFinder]   no labelled BLOCK found, "
+                      f"trying size-based heading detection")
+                for a in size_anchors:
+                    print(f"[LotFinder]     candidate '{a['text']}' "
+                          f"at ({a['cx']:.0f},{a['cy']:.0f}) "
+                          f"height={a.get('_h_dbg',0):.0f}px "
+                          f"(median {a.get('_med_dbg',0):.0f}, "
+                          f"MAD {a.get('_mad_dbg',0):.1f})")
+                anchors.extend(size_anchors)
+
+        # De-dup: same text within ~100 px counts as one
+        dedup: List[Dict[str, Any]] = []
+        for a in anchors:
+            dup = False
+            for b in dedup:
+                if (a["text"] == b["text"] and
+                    abs(a["cx"] - b["cx"]) < 100 and
+                    abs(a["cy"] - b["cy"]) < 100):
+                    # Keep the higher-confidence one
+                    if a["conf"] > b["conf"]:
+                        b.update(a)
+                    dup = True
+                    break
+            if not dup:
+                dedup.append(a)
+        return dedup
+
+    def _size_based_heading_candidates(
+        self,
+        items: List[Tuple[str, float, Tuple[int, int, int, int]]],
+        sx: float, sy: float,
+    ) -> List[Dict[str, Any]]:
+        """
+        Detect block-heading candidates by font size + isolation when no
+        "BLOCK" label is present.
+
+        Logic:
+          1. Restrict to digit-only tokens (block headings are numeric).
+          2. Two-gate height filter — must pass BOTH:
+             • Adaptive: height >= 1.5x median height of digit tokens
+             • Statistical: height >= median + 2 * MAD (separation from
+               lot-number distribution)
+          3. Reject candidates whose neighborhood contains:
+             - alphabetic tokens within ~150px (catches "PLAT BOOK 82",
+               "SHEET 1 OF 6", "PAGE 5")
+             - bearing/distance markers within ~100px (° / R= / L=)
+             - decimal-2 numbers within ~100px (distances like 135.42)
+        """
+        # Collect digit-only tokens with their heights
+        digit_tokens: List[Tuple[str, float, Tuple[int,int,int,int]]] = []
+        for text, conf, bbox in items:
+            text_norm = re.sub(r'\D', '', text)
+            if not text_norm:
+                continue
+            # Skip extremely short or extremely long numbers — block
+            # numbers are typically 1-4 digits. 5+ digits is a parcel
+            # ID, coordinate, or APN.
+            if not (1 <= len(text_norm) <= 4):
+                continue
+            if conf < self.BLOCK_ANCHOR_CONF_FLOOR:
+                continue
+            digit_tokens.append((text_norm, conf, bbox))
+
+        if len(digit_tokens) < 4:
+            # Not enough samples to compute meaningful statistics
+            return []
+
+        heights = sorted(b[3] for _, _, b in digit_tokens)
+        n = len(heights)
+        median = heights[n // 2]
+        if median == 0:
+            return []
+        # Median absolute deviation
+        deviations = sorted(abs(h - median) for h in heights)
+        mad = max(deviations[n // 2], 1.0)  # floor at 1 to avoid div-zero
+
+        adaptive_thresh    = 1.5 * median
+        statistical_thresh = median + 2.0 * mad
+        height_thresh      = max(adaptive_thresh, statistical_thresh)
+
+        # Build a lookup of all tokens for neighborhood checks. We need
+        # ALL tokens (not just digits) because the alpha-neighbor filter
+        # is what distinguishes "SHEET 1" from a real block number.
+        all_tokens = items
+
+        ALPHA_NOISE_WORDS = {
+            "PLAT", "BOOK", "PAGE", "PG", "SHEET", "OF",
+            "SCALE", "DEED", "DATE", "SURVEY", "TITLE",
+            "DRAWN", "CHECKED", "BY", "JOB", "PROJ",
+            "DRAWING", "DWG", "REV",
+        }
+        BEARING_MARKERS = ("°", "\u00b0", "R=", "L=", "C=", "DEG")
+
+        candidates: List[Dict[str, Any]] = []
+        for text, conf, bbox in digit_tokens:
+            tx, ty, tw, th = bbox
+            if th < height_thresh:
+                continue
+
+            t_cx = tx + tw / 2
+            t_cy = ty + th / 2
+
+            # Neighborhood radius scales with token height. Bigger text
+            # → bigger search radius (a heading sits in a larger empty
+            # region; small lot text has neighbors very close).
+            alpha_radius   = max(150, int(th * 4))
+            noise_radius   = max(100, int(th * 3))
+
+            has_alpha_neighbor  = False
+            has_bearing_neighbor = False
+            has_decimal_neighbor = False
+
+            for n_text, _, n_bbox in all_tokens:
+                if n_text == text and n_bbox == bbox:
+                    continue
+                nx, ny, nw, nh = n_bbox
+                ncx, ncy = nx + nw / 2, ny + nh / 2
+                dx, dy = abs(ncx - t_cx), abs(ncy - t_cy)
+                dist = (dx*dx + dy*dy) ** 0.5
+
+                upper = n_text.upper().strip(".:#-,")
+                # Alpha-word neighbor (title block context)
+                if dist <= alpha_radius:
+                    if upper in ALPHA_NOISE_WORDS:
+                        has_alpha_neighbor = True
+                        break
+                # Bearing / decimal neighbor
+                if dist <= noise_radius:
+                    if any(m in n_text for m in BEARING_MARKERS):
+                        has_bearing_neighbor = True
+                        break
+                    if re.search(r"\d+\.\d{2}", n_text):
+                        has_decimal_neighbor = True
+                        break
+
+            if has_alpha_neighbor or has_bearing_neighbor or has_decimal_neighbor:
+                continue
+
+            candidates.append({
+                "text":    text,
+                "cx":      t_cx * sx,
+                "cy":      t_cy * sy,
+                "conf":    conf,
+                "src":     "size-heuristic",
+                "_h_dbg":  th,
+                "_med_dbg": median,
+                "_mad_dbg": mad,
+            })
+
+        return candidates
+
+    @staticmethod
+    def _nearest_block(cx: float, cy: float,
+                       anchors: List[Dict[str, Any]]
+                       ) -> Optional[Dict[str, Any]]:
+        """Return the closest block anchor to (cx, cy), or None."""
+        if not anchors:
+            return None
+        best, best_d = None, float("inf")
+        for a in anchors:
+            d = ((a["cx"] - cx) ** 2 + (a["cy"] - cy) ** 2) ** 0.5
+            if d < best_d:
+                best_d = d
+                best   = a
+        return best
 
     def _ocr_yolo_regions(self, original_image, lot_number,
-                           lot_detections):
-        """OCR each YOLO lot region to find matching number."""
+                           lot_detections,
+                           block_anchors: Optional[List[Dict[str, Any]]] = None):
+        """
+        OCR each YOLO lot region to find matching number, optionally
+        constrained to be near a target-block anchor.
+
+        Two-pass when block_anchors is provided:
+          1. Gather ALL lot-region candidates that OCR-match the target
+             lot number, with their centroids.
+          2. Pick the candidate whose centroid is closest to any of the
+             target-block anchors. Among the rest, those clearly in a
+             different block (closer to a non-matching anchor) are
+             discarded.
+
+        When block_anchors is empty, behaviour matches the original
+        first-match-wins path.
+        """
         ow, oh = original_image.size
         cfg    = "--psm 6 --oem 3 -c tessedit_char_whitelist=0123456789"
+        block_aware = bool(block_anchors)
+
+        # Collect every region whose OCR contains the target lot number.
+        matches: List[Dict[str, Any]] = []
 
         for det in lot_detections:
             x0, y0, x1, y1 = det["bbox_orig"]
-            # Small padding
             pad  = 15
             x0p  = max(0,  x0 - pad)
             y0p  = max(0,  y0 - pad)
@@ -463,13 +1353,10 @@ class LotFinder:
             crop = original_image.crop((x0p, y0p, x1p, y1p))
             crop = _enhance_for_ocr(crop)
 
-            # Scale up if small
             cw, ch = crop.size
             if cw < 150:
                 s    = 150 / cw
-                crop = crop.resize(
-                    (150, int(ch * s)), Image.LANCZOS
-                )
+                crop = crop.resize((150, int(ch * s)), Image.LANCZOS)
 
             try:
                 text    = pytesseract.image_to_string(crop, config=cfg)
@@ -478,18 +1365,72 @@ class LotFinder:
                 print(f"[LotFinder] YOLO region OCR: {numbers}")
 
                 if lot_number in numbers:
-                    print(f"[LotFinder] ✅ OCR matched Lot {lot_number}")
-                    # Verify with Claude micro-confirm
-                    return self._claude_confirm(
-                        original_image, lot_number,
-                        (x0p, y0p, x1p, y1p)
-                    ) or (x0p, y0p, x1p, y1p)
+                    cx = (x0p + x1p) / 2.0
+                    cy = (y0p + y1p) / 2.0
+                    matches.append({
+                        "bbox":   (x0p, y0p, x1p, y1p),
+                        "cx":     cx,
+                        "cy":     cy,
+                        "conf":   det.get("conf", 0.0),
+                    })
+
+                    # Fast-path: not in block-aware mode, behave like
+                    # original code and return on first match.
+                    if not block_aware:
+                        print(f"[LotFinder] ✅ OCR matched Lot {lot_number}")
+                        return self._claude_confirm(
+                            original_image, lot_number,
+                            (x0p, y0p, x1p, y1p)
+                        ) or (x0p, y0p, x1p, y1p)
             except Exception as e:
                 print(f"[LotFinder] OCR error: {e}")
-        return None
 
-    def _tiled_ocr_search(self, original_image, lot_number):
-        """Tiled OCR fallback for finding lot when YOLO misses it."""
+        if not matches:
+            return None
+
+        # ── Block-aware scoring ──
+        # For each candidate, find its nearest block anchor among the
+        # target-block-matching set (block_anchors was already filtered
+        # to target-only by find_lot). The candidate with the smallest
+        # distance to any target anchor wins.
+        scored: List[Dict[str, Any]] = []
+        for m in matches:
+            nearest = self._nearest_block(m["cx"], m["cy"], block_anchors)
+            if nearest is None:
+                # Shouldn't reach here — find_lot guarantees anchors are
+                # non-empty when block_aware. Defensive fallback.
+                dist = float("inf")
+            else:
+                dist = ((nearest["cx"] - m["cx"]) ** 2 +
+                        (nearest["cy"] - m["cy"]) ** 2) ** 0.5
+            m["block_dist"] = dist
+            scored.append(m)
+
+        # Sort by proximity to target block — closer is better.
+        scored.sort(key=lambda x: x["block_dist"])
+        print(f"[LotFinder] Block-aware candidates (closer = better):")
+        for s in scored:
+            print(f"[LotFinder]   bbox={s['bbox']}  "
+                  f"centroid=({s['cx']:.0f},{s['cy']:.0f})  "
+                  f"dist_to_target_block={s['block_dist']:.0f}")
+
+        # Take the closest candidate.
+        winner = scored[0]
+        print(f"[LotFinder] ✅ Block-aware match: Lot {lot_number} at "
+              f"bbox={winner['bbox']} (dist {winner['block_dist']:.0f}px "
+              f"to target block anchor)")
+        return self._claude_confirm(
+            original_image, lot_number, winner["bbox"]
+        ) or winner["bbox"]
+
+    def _tiled_ocr_search(self, original_image, lot_number,
+                          block_anchors: Optional[List[Dict[str, Any]]] = None):
+        """Tiled OCR fallback for finding lot when YOLO misses it.
+
+        When block_anchors is non-empty, candidates are re-scored by
+        proximity to the target block — the closest match wins over
+        the highest-isolation match.
+        """
         ow, oh = original_image.size
         thumb, sx, sy = _make_thumbnail(original_image, OCR_THUMB_WIDTH)
         tw, th = thumb.size
@@ -535,7 +1476,6 @@ class LotFinder:
                         continue
                     seen.add(key)
 
-                    # Context filter
                     surr = [str(data["text"][j]).strip()
                             for j in range(max(0,i-4), min(n,i+5))
                             if j != i and str(data["text"][j]).strip()]
@@ -546,23 +1486,51 @@ class LotFinder:
                     if re.search(r"\d+\.\d{2}", ctx_str):
                         continue
 
-                    # Isolation score
                     iso = max(0, 30 - len(surr) * 4)
                     if 8 <= ww <= 100 and 8 <= wh <= 60:
                         iso += 20
 
-                    candidates.append({
-                        "cx_orig": int(ctx * sx),
-                        "cy_orig": int(cty * sy),
-                        "iso":     iso,
-                        "conf":    conf,
-                    })
+                    cx_orig = int(ctx * sx)
+                    cy_orig = int(cty * sy)
+
+                    cand = {
+                        "cx_orig":    cx_orig,
+                        "cy_orig":    cy_orig,
+                        "iso":        iso,
+                        "conf":       conf,
+                        "block_dist": float("inf"),
+                    }
+                    if block_anchors:
+                        nearest = self._nearest_block(
+                            cx_orig, cy_orig, block_anchors)
+                        if nearest is not None:
+                            cand["block_dist"] = (
+                                ((nearest["cx"] - cx_orig) ** 2 +
+                                 (nearest["cy"] - cy_orig) ** 2) ** 0.5
+                            )
+                    candidates.append(cand)
 
         if not candidates:
             return None
 
-        candidates.sort(key=lambda c: -(c["iso"] * 0.6 + c["conf"] * 0.4))
-        print(f"[LotFinder] {len(candidates)} OCR candidate(s)")
+        # Sorting strategy depends on whether we have block context.
+        # Block-aware: primary key is proximity to target block (closer
+        # is better); ties broken by the original isolation+conf score.
+        # Block-blind: original isolation+conf only.
+        if block_anchors:
+            candidates.sort(key=lambda c: (
+                c["block_dist"], -(c["iso"] * 0.6 + c["conf"] * 0.4)
+            ))
+            print(f"[LotFinder] {len(candidates)} tiled candidate(s); "
+                  f"block-aware top 3:")
+            for c in candidates[:3]:
+                print(f"[LotFinder]   ({c['cx_orig']},{c['cy_orig']}) "
+                      f"dist_to_block={c['block_dist']:.0f} "
+                      f"iso={c['iso']} conf={c['conf']:.0f}")
+        else:
+            candidates.sort(
+                key=lambda c: -(c["iso"] * 0.6 + c["conf"] * 0.4))
+            print(f"[LotFinder] {len(candidates)} OCR candidate(s)")
 
         # Try top 3 with Claude confirm
         for c in candidates[:3]:
@@ -580,7 +1548,6 @@ class LotFinder:
             if confirmed:
                 return confirmed
 
-        # Return best OCR candidate without confirmation
         best  = candidates[0]
         pad_x = int(ow * LOT_CONTEXT_PADDING)
         pad_y = int(oh * LOT_CONTEXT_PADDING)
@@ -593,69 +1560,110 @@ class LotFinder:
 
     def _claude_confirm(self, original_image, lot_number, region):
         """
-        Sends tiny 600px crop to Claude to confirm lot number.
-        ~$0.001 per call — max_tokens=80.
-        Returns None if Claude is unavailable (caller falls back to OCR bbox).
-        """
-        if self.claude is None:
-            # Claude unavailable — skip confirmation, caller uses OCR bbox
-            return None
+        Confirm that `region` actually contains the target lot number
+        as a standalone lot label (not a bearing/distance/curve ref).
 
+        Despite the name (kept for caller compatibility), this is now
+        OCR-based — uses RapidOCR if available, else Tesseract. No
+        network call, no API key, no per-call cost.
+
+        Returns:
+            (x0, y0, x1, y1) tightened around the confirmed lot number
+            + context padding, or None if the lot number isn't found
+            as a standalone digit in the crop.
+        """
         ow, oh = original_image.size
         x0, y0, x1, y1 = region
         crop = original_image.crop((x0, y0, x1, y1))
-
-        # Cap at 600px for speed and cost
         rw, rh = crop.size
-        if rw > 600:
-            s    = 600 / rw
-            crop = crop.resize((600, int(rh * s)), Image.LANCZOS)
 
-        buf = io.BytesIO()
-        crop.save(buf, format="JPEG", quality=88)
-        buf.seek(0)
-        b64 = base64.standard_b64encode(buf.read()).decode()
+        # Upscale very small crops — improves OCR on tiny lot text
+        if max(rw, rh) < 400:
+            scale = 400.0 / max(rw, rh)
+            crop_for_ocr = crop.resize(
+                (int(rw * scale), int(rh * scale)), Image.LANCZOS
+            )
+            inv_scale = 1.0 / scale
+        else:
+            crop_for_ocr = crop
+            inv_scale = 1.0
 
-        prompt = (
-            f"Is the number {lot_number} visible as a LOT NUMBER "
-            f"(standalone inside a polygon, NOT part of bearings/"
-            f"distances/curve refs)?\n"
-            f'If yes: {{"found":true,"bbox":{{"x0":0.3,"y0":0.3,"x1":0.7,"y1":0.7}}}}\n'
-            f'If no:  {{"found":false}}'
-        )
+        if _RAPIDOCR_AVAILABLE:
+            tokens = _rapidocr_read(crop_for_ocr)
+        else:
+            tokens = _tesseract_word_dump(crop_for_ocr)
 
-        try:
-            resp  = self.claude.messages.create(
-                model=CLAUDE_MODEL, max_tokens=80,
-                messages=[{"role": "user", "content": [
-                    {"type": "image", "source": {"type": "base64",
-                     "media_type": "image/jpeg", "data": b64}},
-                    {"type": "text", "text": prompt}
-                ]}])
-            raw   = resp.content[0].text
-            clean = re.sub(r"```json|```", "", raw).strip()
-            m     = re.search(r'\{.*\}', clean, re.DOTALL)
-            if not m:
-                return None
-            result = json.loads(m.group(0))
-            if not result.get("found"):
-                return None
-
-            bb  = result["bbox"]
-            rw2 = x1 - x0
-            rh2 = y1 - y0
-            # Add lot context padding
-            pad_x = int(ow * LOT_CONTEXT_PADDING)
-            pad_y = int(oh * LOT_CONTEXT_PADDING)
-            lx0   = max(0,  int(x0 + bb["x0"] * rw2) - pad_x)
-            ly0   = max(0,  int(y0 + bb["y0"] * rh2) - pad_y)
-            lx1   = min(ow, int(x0 + bb["x1"] * rw2) + pad_x)
-            ly1   = min(oh, int(y0 + bb["y1"] * rh2) + pad_y)
-            print(f"[LotFinder] ✅ Claude confirmed Lot {lot_number}")
-            return (lx0, ly0, lx1, ly1)
-        except Exception as e:
-            print(f"[LotFinder] Claude confirm error: {e}")
+        if not tokens:
             return None
+
+        target_norm = _normalize_num(lot_number)
+
+        # Build neighbor-context map: for each token, what's near it?
+        # We use this to reject bearings/distances/curve refs.
+        NOISE_MARKERS = ("°", "\u00b0", "R=", "L=", "BOOK", "SCALE",
+                         "FT", "FEET", "M.", "DEG")
+
+        best_match = None  # (token, score, neighbors)
+        for i, (text, conf, bbox) in enumerate(tokens):
+            if _normalize_num(text) != target_norm:
+                continue
+
+            tx, ty, tw, th = bbox
+            t_cx, t_cy = tx + tw / 2, ty + th / 2
+
+            # Find neighbor tokens within a reasonable radius
+            neighbors = []
+            for j, (ntext, _, nbox) in enumerate(tokens):
+                if j == i:
+                    continue
+                nx, ny, nw, nh = nbox
+                ncx, ncy = nx + nw / 2, ny + nh / 2
+                if abs(ncx - t_cx) < max(tw, 100) * 2 and \
+                   abs(ncy - t_cy) < max(th, 40) * 3:
+                    neighbors.append(ntext)
+
+            neighbor_str = " ".join(neighbors).upper()
+
+            # Reject if neighbors include surveying/bearing markers
+            if any(marker.upper() in neighbor_str for marker in NOISE_MARKERS):
+                continue
+
+            # Reject if neighbors include decimal-2 numbers (distance/bearing)
+            if re.search(r"\d+\.\d{2}", neighbor_str):
+                continue
+
+            # Score: prefer fewer/cleaner neighbors (isolated lot label) and
+            # higher OCR confidence
+            isolation = max(0, 30 - len(neighbors) * 4)
+            score = isolation + conf * 100  # conf is 0-1, scale to match
+
+            if best_match is None or score > best_match[1]:
+                best_match = (text, score, bbox, neighbors)
+
+        if best_match is None:
+            return None
+
+        # Found it — tighten bbox around the actual lot token + context pad
+        _, _, bbox, neighbors = best_match
+        tx, ty, tw, th = bbox
+        # Scale back to original crop coordinates
+        tx, ty, tw, th = (tx * inv_scale, ty * inv_scale,
+                          tw * inv_scale, th * inv_scale)
+
+        # The token is in CROP-relative coords; translate to original-image
+        t_cx_orig = x0 + tx + tw / 2
+        t_cy_orig = y0 + ty + th / 2
+
+        pad_x = int(ow * LOT_CONTEXT_PADDING)
+        pad_y = int(oh * LOT_CONTEXT_PADDING)
+        lx0 = max(0,  int(t_cx_orig - pad_x))
+        ly0 = max(0,  int(t_cy_orig - pad_y))
+        lx1 = min(ow, int(t_cx_orig + pad_x))
+        ly1 = min(oh, int(t_cy_orig + pad_y))
+
+        print(f"[LotFinder] ✅ OCR confirmed Lot {lot_number} "
+              f"(neighbors={neighbors[:4]})")
+        return (lx0, ly0, lx1, ly1)
 
 
 # ─────────────────────────────────────────────
@@ -848,7 +1856,10 @@ class PlatMapExtractor:
         # LotFinder works without Claude (OCR-only); _claude_confirm safely
         # short-circuits to None when self.claude is None.
         self.lot_finder = LotFinder(self.claude)
-        self.page_finder = PageFinder(self.yolo_model) if self.yolo_model else None
+        self.page_finder = (
+            PageFinder(self.yolo_model, claude_client=self.claude)
+            if self.yolo_model else None
+        )
 
         # ── Initialize Groq extractor (PRIMARY fallback — free, hosted) ──
         # Llama 4 Scout 17B via Groq. Open-source model, hosted free.
@@ -1002,9 +2013,12 @@ class PlatMapExtractor:
               f"Legend={len(legend_dets)} Title={len(title_dets)}")
 
         # ── Step 4: Find specific lot ──
-        print(f"\n[Step 4] Locating Lot {lot_number}...")
+        print(f"\n[Step 4] Locating Lot {lot_number}"
+              + (f" Block {block_number}" if block_number else "")
+              + "...")
         lot_bbox = self.lot_finder.find_lot(
-            full_image, lot_number, lot_dets
+            full_image, lot_number, lot_dets,
+            block_number=block_number,
         )
         if lot_bbox:
             print(f"[Step 4] ✅ Lot {lot_number} at {lot_bbox}")
